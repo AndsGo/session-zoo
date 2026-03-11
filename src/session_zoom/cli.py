@@ -283,17 +283,32 @@ def summarize(
     id: Optional[str] = typer.Argument(None, help="Session ID (omit for all)"),
     force: bool = typer.Option(False, help="Regenerate existing summaries"),
     model: Optional[str] = typer.Option(None, help="AI model to use"),
+    provider: Optional[str] = typer.Option(None, help="Provider: auto, claude-code, codex, api"),
 ):
-    """Generate AI summaries for sessions."""
-    from session_zoom.summarizer import generate_summary
+    """Generate AI summaries for sessions.
+
+    Without --provider, auto-detects: claude CLI > codex CLI > API key.
+    No API key needed if claude or codex CLI is installed.
+    """
+    from session_zoom.summarizer import generate_summary, detect_provider
 
     cfg = _get_config()
-    if not cfg.ai_key:
-        console.print("[red]AI key not set. Run: zoom config set ai-key <key>[/red]")
-        raise typer.Exit(1)
-
     db = _get_db()
-    ai_model = model or cfg.ai_model
+    prov = provider or "auto"
+
+    # Show which provider will be used
+    if prov == "auto":
+        if cfg.ai_key:
+            effective = "api"
+        else:
+            effective = detect_provider()
+            if effective is None:
+                console.print(
+                    "[red]No provider available. Install claude-code or codex, "
+                    "or run: zoom config set ai-key <key>[/red]"
+                )
+                raise typer.Exit(1)
+        console.print(f"[dim]Using provider: {effective}[/dim]")
 
     if id:
         sessions = [db.get_session(id)]
@@ -316,10 +331,18 @@ def summarize(
 
         parsed = adapter.parse(source)
         console.print(f"Summarizing {s['id'][:12]} ({s['project']})...", end=" ")
-        summary = generate_summary(parsed, api_key=cfg.ai_key, model=ai_model)
-        db.update_summary(s["id"], summary)
-        console.print("[green]done[/green]")
-        count += 1
+        try:
+            summary = generate_summary(
+                parsed,
+                provider=prov,
+                api_key=cfg.ai_key,
+                model=model,
+            )
+            db.update_summary(s["id"], summary)
+            console.print("[green]done[/green]")
+            count += 1
+        except RuntimeError as e:
+            console.print(f"[red]failed: {e}[/red]")
 
     console.print(f"\n[green]Summarized {count} session(s)[/green]")
 

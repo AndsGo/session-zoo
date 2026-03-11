@@ -2,7 +2,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from session_zoom.models import Session, Message
-from session_zoom.summarizer import generate_summary, build_prompt
+from session_zoom.summarizer import (
+    generate_summary, build_prompt, detect_provider,
+)
 
 
 def _make_session() -> Session:
@@ -46,17 +48,110 @@ def test_build_prompt_truncates_long_sessions():
         messages=msgs,
     )
     prompt = build_prompt(session)
-    assert len(prompt) < 100_000  # Should be truncated
+    assert len(prompt) < 100_000
 
 
-@patch("session_zoom.summarizer.anthropic")
-def test_generate_summary(mock_anthropic):
+# --- API provider ---
+
+@patch("anthropic.Anthropic")
+def test_generate_summary_via_api(mock_anthropic_cls):
     mock_client = MagicMock()
-    mock_anthropic.Anthropic.return_value = mock_client
+    mock_anthropic_cls.return_value = mock_client
     mock_client.messages.create.return_value = MagicMock(
         content=[MagicMock(text="Fixed XSS vulnerability in login page")]
     )
 
-    result = generate_summary(_make_session(), api_key="test-key")
+    result = generate_summary(_make_session(), provider="api", api_key="test-key")
     assert result == "Fixed XSS vulnerability in login page"
     mock_client.messages.create.assert_called_once()
+
+
+# --- Claude Code CLI provider ---
+
+@patch("subprocess.run")
+def test_generate_summary_via_claude_code(mock_run):
+    mock_run.return_value = MagicMock(
+        returncode=0,
+        stdout="Fixed XSS vulnerability in login page",
+        stderr="",
+    )
+
+    result = generate_summary(_make_session(), provider="claude-code")
+    assert result == "Fixed XSS vulnerability in login page"
+
+    call_args = mock_run.call_args
+    cmd = call_args[0][0]
+    assert cmd[0] == "claude"
+    assert "-p" in cmd
+    assert "--no-session-persistence" in cmd
+    assert call_args[1]["input"]  # prompt passed via stdin
+
+
+@patch("subprocess.run")
+def test_generate_summary_via_claude_code_with_model(mock_run):
+    mock_run.return_value = MagicMock(returncode=0, stdout="Summary", stderr="")
+
+    generate_summary(_make_session(), provider="claude-code", model="haiku")
+    cmd = mock_run.call_args[0][0]
+    assert "--model" in cmd
+    assert "haiku" in cmd
+
+
+# --- Codex CLI provider ---
+
+@patch("subprocess.run")
+def test_generate_summary_via_codex(mock_run):
+    mock_run.return_value = MagicMock(
+        returncode=0,
+        stdout="Fixed XSS vulnerability",
+        stderr="",
+    )
+
+    result = generate_summary(_make_session(), provider="codex")
+    assert result == "Fixed XSS vulnerability"
+
+    cmd = mock_run.call_args[0][0]
+    assert cmd[0] == "codex"
+    assert "-q" in cmd
+
+
+# --- Auto-detection ---
+
+@patch("shutil.which")
+def test_detect_provider_claude(mock_which):
+    mock_which.side_effect = lambda x: "/usr/bin/claude" if x == "claude" else None
+    assert detect_provider() == "claude-code"
+
+
+@patch("shutil.which")
+def test_detect_provider_codex(mock_which):
+    mock_which.side_effect = lambda x: "/usr/bin/codex" if x == "codex" else None
+    assert detect_provider() == "codex"
+
+
+@patch("shutil.which", return_value=None)
+def test_detect_provider_none(mock_which):
+    assert detect_provider() is None
+
+
+@patch("subprocess.run")
+@patch("shutil.which", return_value="/usr/bin/claude")
+def test_generate_summary_auto_uses_cli(mock_which, mock_run):
+    mock_run.return_value = MagicMock(returncode=0, stdout="Summary", stderr="")
+
+    result = generate_summary(_make_session(), provider="auto")
+    assert result == "Summary"
+    cmd = mock_run.call_args[0][0]
+    assert cmd[0] == "claude"
+
+
+@patch("anthropic.Anthropic")
+def test_generate_summary_auto_prefers_api_key(mock_anthropic_cls):
+    mock_client = MagicMock()
+    mock_anthropic_cls.return_value = mock_client
+    mock_client.messages.create.return_value = MagicMock(
+        content=[MagicMock(text="API Summary")]
+    )
+
+    result = generate_summary(_make_session(), provider="auto", api_key="test-key")
+    assert result == "API Summary"

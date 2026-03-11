@@ -52,13 +52,13 @@ def test_full_workflow(sample_claude_session, tmp_path):
         result = runner.invoke(app, ["config", "set", "ai-key", "test-key"])
         assert result.exit_code == 0, f"config set ai-key failed: {result.stdout}"
 
-        with patch("session_zoom.summarizer.anthropic") as mock_anthropic:
+        with patch("anthropic.Anthropic") as mock_anthropic_cls:
             mock_client = MagicMock()
-            mock_anthropic.Anthropic.return_value = mock_client
+            mock_anthropic_cls.return_value = mock_client
             mock_client.messages.create.return_value = MagicMock(
                 content=[MagicMock(text="Fixed login bug with XSS sanitization")]
             )
-            result = runner.invoke(app, ["summarize", "test-session-001"])
+            result = runner.invoke(app, ["summarize", "--provider", "api", "test-session-001"])
             assert result.exit_code == 0, f"summarize failed: {result.stdout}"
             assert "done" in result.stdout
 
