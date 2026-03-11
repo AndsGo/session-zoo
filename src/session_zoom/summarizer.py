@@ -106,12 +106,16 @@ def _summarize_via_claude(prompt: str, model: str | None = None) -> str:
     cmd = ["claude", "-p", "--no-session-persistence"]
     if model:
         cmd.extend(["--model", model])
+    # Remove CLAUDECODE env var to allow running inside a Claude Code session
+    import os
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
     result = subprocess.run(
         cmd,
         input=prompt,
         capture_output=True,
         text=True,
         timeout=120,
+        env=env,
     )
     if result.returncode != 0:
         raise RuntimeError(f"claude CLI failed: {result.stderr.strip()}")
