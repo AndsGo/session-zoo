@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from session_zoon.db import SessionDB
+from session_zoom.db import SessionDB
 
 
 def _make_db(tmp_path) -> SessionDB:

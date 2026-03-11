@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from session_zoon.models import Session, Message
+from session_zoom.models import Session, Message
 
 
 def test_message_creation():

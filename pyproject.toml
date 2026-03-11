@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "session-zoon"
+name = "session-zoom"
 version = "0.1.0"
 description = "AI development session recorder — save and sync sessions to GitHub"
 requires-python = ">=3.12"
@@ -20,4 +20,4 @@ dev = [
 ]
 
 [project.scripts]
-zoom = "session_zoon.cli:app"
+zoom = "session_zoom.cli:app"

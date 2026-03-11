@@ -1,5 +1,5 @@
 from pathlib import Path
-from session_zoon.config import Config, load_config, save_config
+from session_zoom.config import Config, load_config, save_config
 
 
 def test_default_config():

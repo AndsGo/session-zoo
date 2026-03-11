@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from session_zoon.models import Session, Message
-from session_zoon.summarizer import generate_summary, build_prompt
+from session_zoom.models import Session, Message
+from session_zoom.summarizer import generate_summary, build_prompt
 
 
 def _make_session() -> Session:
@@ -49,7 +49,7 @@ def test_build_prompt_truncates_long_sessions():
     assert len(prompt) < 100_000  # Should be truncated
 
 
-@patch("session_zoon.summarizer.anthropic")
+@patch("session_zoom.summarizer.anthropic")
 def test_generate_summary(mock_anthropic):
     mock_client = MagicMock()
     mock_anthropic.Anthropic.return_value = mock_client

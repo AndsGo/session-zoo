@@ -1,4 +1,4 @@
-from session_zoon.models import Session
+from session_zoom.models import Session
 
 
 def render_session_markdown(session: Session, *,

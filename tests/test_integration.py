@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
-from session_zoon.cli import app
+from session_zoom.cli import app
 
 runner = CliRunner()
 
@@ -17,8 +17,8 @@ def test_full_workflow(sample_claude_session, tmp_path):
     remote = tmp_path / "remote.git"
     subprocess.run(["git", "init", "--bare", str(remote)], capture_output=True, check=True)
 
-    with patch("session_zoon.cli._config_dir", return_value=config_dir), \
-         patch("session_zoon.cli._claude_dir", return_value=claude_dir):
+    with patch("session_zoom.cli._config_dir", return_value=config_dir), \
+         patch("session_zoom.cli._claude_dir", return_value=claude_dir):
 
         # 1. Init
         result = runner.invoke(app, ["init"])
@@ -52,7 +52,7 @@ def test_full_workflow(sample_claude_session, tmp_path):
         result = runner.invoke(app, ["config", "set", "ai-key", "test-key"])
         assert result.exit_code == 0, f"config set ai-key failed: {result.stdout}"
 
-        with patch("session_zoon.summarizer.anthropic") as mock_anthropic:
+        with patch("session_zoom.summarizer.anthropic") as mock_anthropic:
             mock_client = MagicMock()
             mock_anthropic.Anthropic.return_value = mock_client
             mock_client.messages.create.return_value = MagicMock(

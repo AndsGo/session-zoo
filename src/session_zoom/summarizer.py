@@ -1,6 +1,6 @@
 import anthropic
 
-from session_zoon.models import Session
+from session_zoom.models import Session
 
 MAX_PROMPT_CHARS = 80_000
 

@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from session_zoon.models import Message, Session
+from session_zoom.models import Message, Session
 
 
 class ClaudeCodeAdapter:

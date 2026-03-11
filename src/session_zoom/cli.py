@@ -6,10 +6,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from session_zoon.config import Config, load_config, save_config
-from session_zoon.db import SessionDB
-from session_zoon.adapters import get_adapter, list_adapters
-from session_zoon.renderer import render_session_markdown
+from session_zoom.config import Config, load_config, save_config
+from session_zoom.db import SessionDB
+from session_zoom.adapters import get_adapter, list_adapters
+from session_zoom.renderer import render_session_markdown
 
 app = typer.Typer(name="zoom", help="AI development session recorder")
 config_app = typer.Typer(help="Manage configuration")
@@ -285,7 +285,7 @@ def summarize(
     model: Optional[str] = typer.Option(None, help="AI model to use"),
 ):
     """Generate AI summaries for sessions."""
-    from session_zoon.summarizer import generate_summary
+    from session_zoom.summarizer import generate_summary
 
     cfg = _get_config()
     if not cfg.ai_key:
@@ -329,7 +329,7 @@ def sync(
     dry_run: bool = typer.Option(False, help="Preview changes without syncing"),
 ):
     """Sync sessions to GitHub."""
-    from session_zoon import sync as sync_module
+    from session_zoom import sync as sync_module
 
     cfg = _get_config()
     if not cfg.repo:
@@ -404,7 +404,7 @@ def sync(
 @app.command("clone")
 def clone():
     """Clone the session repo to local."""
-    from session_zoon import sync as sync_module
+    from session_zoom import sync as sync_module
 
     cfg = _get_config()
     if not cfg.repo:
@@ -423,7 +423,7 @@ def clone():
 @app.command("reindex")
 def reindex():
     """Rebuild SQLite index from repo files."""
-    from session_zoon import sync as sync_module
+    from session_zoom import sync as sync_module
 
     cfg = _get_config()
     repo_dir = cfg.repo_dir
@@ -465,7 +465,7 @@ def restore(
 ):
     """Restore session files to tool directories (e.g. ~/.claude/) for /resume support."""
     import shutil
-    from session_zoon import sync as sync_module
+    from session_zoom import sync as sync_module
 
     cfg = _get_config()
     repo_dir = cfg.repo_dir
@@ -484,7 +484,7 @@ def restore(
 
         adapter = get_adapter(entry["tool"], claude_dir=_claude_dir())
         meta = entry["meta"]
-        from session_zoon.models import Session
+        from session_zoom.models import Session
         session = Session(
             id=entry["session_id"], tool=entry["tool"],
             project=entry["project"], source_path=entry["jsonl_path"],

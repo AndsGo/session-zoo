@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from session_zoon.models import Session, Message
-from session_zoon.renderer import render_session_markdown
+from session_zoom.models import Session, Message
+from session_zoom.renderer import render_session_markdown
 
 
 def _make_session() -> Session:
