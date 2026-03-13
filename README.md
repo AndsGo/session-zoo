@@ -1,5 +1,7 @@
 # session-zoo
 
+[English](README.md) | [中文](README_zh.md)
+
 Save and sync your AI development sessions to GitHub.
 
 `session-zoo` automatically discovers sessions from AI coding tools (Claude Code, Codex, etc.), generates AI summaries, and syncs everything to a GitHub repo — raw data preserved for cross-device migration, plus readable Markdown for review.
