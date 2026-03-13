@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
-from session_zoom.cli import app
+from session_zoo.cli import app
 
 runner = CliRunner()
 
@@ -17,8 +17,8 @@ def test_full_workflow(sample_claude_session, tmp_path):
     remote = tmp_path / "remote.git"
     subprocess.run(["git", "init", "--bare", str(remote)], capture_output=True, check=True)
 
-    with patch("session_zoom.cli._config_dir", return_value=config_dir), \
-         patch("session_zoom.cli._claude_dir", return_value=claude_dir):
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
 
         # 1. Init
         result = runner.invoke(app, ["init"])

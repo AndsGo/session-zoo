@@ -1,7 +1,7 @@
 import shutil
 import subprocess
 
-from session_zoom.models import Session
+from session_zoo.models import Session
 
 MAX_PROMPT_CHARS = 80_000
 
@@ -82,7 +82,7 @@ def generate_summary(session: Session, *,
                 raise RuntimeError(
                     "No summarization provider available. "
                     "Install claude-code or codex, or set an API key with: "
-                    "zoom config set ai-key <key>"
+                    "zoo config set ai-key <key>"
                 )
             provider = detected
 
@@ -95,7 +95,7 @@ def generate_summary(session: Session, *,
         return _summarize_via_codex(full_prompt)
     elif provider == "api":
         if not api_key:
-            raise RuntimeError("API key required for 'api' provider. Run: zoom config set ai-key <key>")
+            raise RuntimeError("API key required for 'api' provider. Run: zoo config set ai-key <key>")
         return _summarize_via_api(prompt, api_key, model)
     else:
         raise ValueError(f"Unknown provider: {provider}")

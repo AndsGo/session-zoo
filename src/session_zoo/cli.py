@@ -6,19 +6,19 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from session_zoom.config import Config, load_config, save_config
-from session_zoom.db import SessionDB
-from session_zoom.adapters import get_adapter, list_adapters
-from session_zoom.renderer import render_session_markdown
+from session_zoo.config import Config, load_config, save_config
+from session_zoo.db import SessionDB
+from session_zoo.adapters import get_adapter, list_adapters
+from session_zoo.renderer import render_session_markdown
 
-app = typer.Typer(name="zoom", help="AI development session recorder")
+app = typer.Typer(name="zoo", help="AI development session recorder")
 config_app = typer.Typer(help="Manage configuration")
 app.add_typer(config_app, name="config")
 console = Console()
 
 
 def _config_dir() -> Path:
-    return Path.home() / ".session-zoon"
+    return Path.home() / ".session-zoo"
 
 
 def _claude_dir() -> Path:
@@ -40,7 +40,7 @@ def _get_db() -> SessionDB:
 
 @app.command()
 def init():
-    """Initialize session-zoon configuration."""
+    """Initialize session-zoo configuration."""
     d = _config_dir()
     d.mkdir(parents=True, exist_ok=True)
     config_path = d / "config.toml"
@@ -48,7 +48,7 @@ def init():
         save_config(Config(config_dir=d), config_path)
     db = SessionDB(d / "index.db")
     db.init()
-    console.print(f"[green]Initialized session-zoon at {d}[/green]")
+    console.print(f"[green]Initialized session-zoo at {d}[/green]")
 
 
 @config_app.command("show")
@@ -275,7 +275,7 @@ def delete_session(
     console.print(f"[green]Deleted session {id} from index[/green]")
 
     if not index_only:
-        console.print("[yellow]Note: Run 'zoom sync' to remove from GitHub repo[/yellow]")
+        console.print("[yellow]Note: Run 'zoo sync' to remove from GitHub repo[/yellow]")
 
 
 @app.command("summarize")
@@ -290,7 +290,7 @@ def summarize(
     Without --provider, auto-detects: claude CLI > codex CLI > API key.
     No API key needed if claude or codex CLI is installed.
     """
-    from session_zoom.summarizer import generate_summary, detect_provider
+    from session_zoo.summarizer import generate_summary, detect_provider
 
     cfg = _get_config()
     db = _get_db()
@@ -305,7 +305,7 @@ def summarize(
             if effective is None:
                 console.print(
                     "[red]No provider available. Install claude-code or codex, "
-                    "or run: zoom config set ai-key <key>[/red]"
+                    "or run: zoo config set ai-key <key>[/red]"
                 )
                 raise typer.Exit(1)
         console.print(f"[dim]Using provider: {effective}[/dim]")
@@ -352,11 +352,11 @@ def sync(
     dry_run: bool = typer.Option(False, help="Preview changes without syncing"),
 ):
     """Sync sessions to GitHub."""
-    from session_zoom import sync as sync_module
+    from session_zoo import sync as sync_module
 
     cfg = _get_config()
     if not cfg.repo:
-        console.print("[red]Repo not set. Run: zoom config set repo <url>[/red]")
+        console.print("[red]Repo not set. Run: zoo config set repo <url>[/red]")
         raise typer.Exit(1)
 
     db = _get_db()
@@ -418,7 +418,7 @@ def sync(
         console.print(f"  [green]Synced {s['id'][:12]}[/green]")
 
     committed = sync_module.commit_and_push(
-        repo_dir, f"zoom: sync {len(pending)} session(s)",
+        repo_dir, f"zoo: sync {len(pending)} session(s)",
     )
     if committed:
         console.print(f"\n[green]Pushed {len(pending)} session(s) to GitHub[/green]")
@@ -427,15 +427,15 @@ def sync(
 @app.command("clone")
 def clone():
     """Clone the session repo to local."""
-    from session_zoom import sync as sync_module
+    from session_zoo import sync as sync_module
 
     cfg = _get_config()
     if not cfg.repo:
-        console.print("[red]Repo not set. Run: zoom config set repo <url>[/red]")
+        console.print("[red]Repo not set. Run: zoo config set repo <url>[/red]")
         raise typer.Exit(1)
 
     if cfg.repo_dir.exists():
-        console.print("[yellow]Repo already exists locally. Use 'zoom sync' to update.[/yellow]")
+        console.print("[yellow]Repo already exists locally. Use 'zoo sync' to update.[/yellow]")
         return
 
     console.print(f"Cloning {cfg.repo}...")
@@ -446,12 +446,12 @@ def clone():
 @app.command("reindex")
 def reindex():
     """Rebuild SQLite index from repo files."""
-    from session_zoom import sync as sync_module
+    from session_zoo import sync as sync_module
 
     cfg = _get_config()
     repo_dir = cfg.repo_dir
     if not repo_dir.exists():
-        console.print("[red]Repo not found. Run 'zoom clone' first.[/red]")
+        console.print("[red]Repo not found. Run 'zoo clone' first.[/red]")
         raise typer.Exit(1)
 
     db = _get_db()
@@ -488,12 +488,12 @@ def restore(
 ):
     """Restore session files to tool directories (e.g. ~/.claude/) for /resume support."""
     import shutil
-    from session_zoom import sync as sync_module
+    from session_zoo import sync as sync_module
 
     cfg = _get_config()
     repo_dir = cfg.repo_dir
     if not repo_dir.exists():
-        console.print("[red]Repo not found. Run 'zoom clone' first.[/red]")
+        console.print("[red]Repo not found. Run 'zoo clone' first.[/red]")
         raise typer.Exit(1)
 
     raw_sessions = sync_module.list_raw_sessions(repo_dir)
@@ -507,7 +507,7 @@ def restore(
 
         adapter = get_adapter(entry["tool"], claude_dir=_claude_dir())
         meta = entry["meta"]
-        from session_zoom.models import Session
+        from session_zoo.models import Session
         session = Session(
             id=entry["session_id"], tool=entry["tool"],
             project=entry["project"], source_path=entry["jsonl_path"],

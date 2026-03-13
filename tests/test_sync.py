@@ -2,7 +2,7 @@ import json
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from session_zoom.sync import (
+from session_zoo.sync import (
     init_repo, copy_raw_session, write_meta_json,
     write_session_markdown, commit_and_push, pull_repo,
     list_raw_sessions,

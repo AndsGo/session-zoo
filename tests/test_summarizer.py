@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from session_zoom.models import Session, Message
-from session_zoom.summarizer import (
+from session_zoo.models import Session, Message
+from session_zoo.summarizer import (
     generate_summary, build_prompt, detect_provider,
 )
 

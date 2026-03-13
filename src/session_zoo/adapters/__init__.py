@@ -1,4 +1,4 @@
-from session_zoom.adapters.claude_code import ClaudeCodeAdapter
+from session_zoo.adapters.claude_code import ClaudeCodeAdapter
 
 _ADAPTERS = {
     "claude-code": ClaudeCodeAdapter,

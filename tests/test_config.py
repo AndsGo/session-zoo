@@ -1,5 +1,5 @@
 from pathlib import Path
-from session_zoom.config import Config, load_config, save_config
+from session_zoo.config import Config, load_config, save_config
 
 
 def test_default_config():
@@ -28,6 +28,6 @@ def test_load_missing_config_returns_default(tmp_path):
 
 def test_config_dir_default():
     cfg = Config()
-    assert cfg.config_dir == Path.home() / ".session-zoon"
-    assert cfg.db_path == Path.home() / ".session-zoon" / "index.db"
-    assert cfg.config_file == Path.home() / ".session-zoon" / "config.toml"
+    assert cfg.config_dir == Path.home() / ".session-zoo"
+    assert cfg.db_path == Path.home() / ".session-zoo" / "index.db"
+    assert cfg.config_file == Path.home() / ".session-zoo" / "config.toml"

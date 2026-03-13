@@ -8,7 +8,7 @@ class Config:
     repo: str | None = None
     ai_key: str | None = None
     ai_model: str = "claude-haiku-4-5-20251001"
-    config_dir: Path = field(default_factory=lambda: Path.home() / ".session-zoon")
+    config_dir: Path = field(default_factory=lambda: Path.home() / ".session-zoo")
 
     @property
     def db_path(self) -> Path:

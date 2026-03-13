@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from session_zoom.adapters.claude_code import ClaudeCodeAdapter
+from session_zoo.adapters.claude_code import ClaudeCodeAdapter
 
 
 def test_discover_finds_sessions(sample_claude_session):

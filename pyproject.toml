@@ -3,10 +3,28 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "session-zoom"
+name = "session-zoo"
 version = "0.1.0"
 description = "AI development session recorder — save and sync sessions to GitHub"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
+authors = [
+    { name = "AndsGo", email = "18702149475@163.com" },
+]
+keywords = ["ai", "session", "recorder", "claude", "codex", "developer-tools"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Typing :: Typed",
+]
 dependencies = [
     "typer>=0.15.0",
     "anthropic>=0.52.0",
@@ -19,5 +37,10 @@ dev = [
     "pytest-tmp-files>=0.0.2",
 ]
 
+[project.urls]
+Homepage = "https://github.com/AndsGo/session-zoo"
+Repository = "https://github.com/AndsGo/session-zoo"
+Issues = "https://github.com/AndsGo/session-zoo/issues"
+
 [project.scripts]
-zoom = "session_zoom.cli:app"
+zoo = "session_zoo.cli:app"
