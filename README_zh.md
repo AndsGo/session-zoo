@@ -6,6 +6,10 @@
 
 `session-zoo` 自动发现 AI 编程工具（Claude Code、Codex 等）的会话记录，生成 AI 摘要，并将所有数据同步到 GitHub 仓库 —— 原始数据完整保留以便跨设备迁移，同时生成可读的 Markdown 方便回顾。
 
+<p align="center">
+  <img src="docs/demo.gif" alt="session-zoo 演示" width="700">
+</p>
+
 ## 特性
 
 - **自动发现** `~/.claude/` 下的会话（内置 Claude Code 适配器）
