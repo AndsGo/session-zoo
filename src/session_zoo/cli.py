@@ -39,7 +39,10 @@ def _get_db() -> SessionDB:
 
 
 @app.command()
-def init():
+def init(
+    skip_skills: bool = typer.Option(False, help="Skip skill installation"),
+    skip_hooks: bool = typer.Option(False, help="Skip hook installation"),
+):
     """Initialize session-zoo configuration."""
     d = _config_dir()
     d.mkdir(parents=True, exist_ok=True)
@@ -49,6 +52,28 @@ def init():
     db = SessionDB(d / "index.db")
     db.init()
     console.print(f"[green]Initialized session-zoo at {d}[/green]")
+
+    # Install skills
+    if not skip_skills:
+        from session_zoo.installer import install_skills
+        claude_dir = _claude_dir()
+        skills_dir = claude_dir / "skills"
+        installed, skipped = install_skills(skills_dir)
+        if installed:
+            console.print(f"[green]Installed {installed} skill(s)[/green]")
+        if skipped:
+            console.print(f"[dim]Skipped {skipped} existing skill(s)[/dim]")
+
+    # Install hook
+    if not skip_hooks:
+        from session_zoo.installer import install_hook
+        claude_dir = _claude_dir()
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        added = install_hook(claude_dir)
+        if added:
+            console.print("[green]Installed SessionStart hook[/green]")
+        else:
+            console.print("[dim]SessionStart hook already installed[/dim]")
 
 
 @config_app.command("show")
