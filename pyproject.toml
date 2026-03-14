@@ -44,3 +44,6 @@ Issues = "https://github.com/AndsGo/session-zoo/issues"
 
 [project.scripts]
 zoo = "session_zoo.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/session_zoo"]
