@@ -83,12 +83,14 @@ def import_sessions(
     tool: Optional[str] = typer.Option(None, help="Filter by tool"),
     project: Optional[str] = typer.Option(None, help="Filter by project"),
     since: Optional[str] = typer.Option(None, help="Only import after date (YYYY-MM-DD)"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Only show output when new sessions found"),
 ):
     """Import new sessions from AI dev tools."""
     db = _get_db()
     since_dt = datetime.fromisoformat(since) if since else None
     tools = [tool] if tool else list_adapters()
     total_imported = 0
+    total_updated = 0
     total_skipped = 0
 
     for tool_name in tools:
@@ -96,8 +98,24 @@ def import_sessions(
         paths = adapter.discover(since=since_dt, project=project)
         for path in paths:
             session = adapter.parse(path)
-            if db.session_exists(session.id):
-                total_skipped += 1
+            existing = db.get_session(session.id)
+            if existing:
+                # Check if session has been updated (more messages or tokens changed)
+                if (existing["message_count"] != session.message_count
+                        or existing["total_tokens"] != session.total_tokens):
+                    db.upsert_session(
+                        id=session.id, tool=session.tool, project=session.project,
+                        source_path=str(session.source_path),
+                        started_at=session.started_at, ended_at=session.ended_at,
+                        model=session.model, total_tokens=session.total_tokens,
+                        message_count=session.message_count,
+                    )
+                    # Mark as modified so next sync picks it up
+                    if existing["sync_status"] == "synced":
+                        db.update_sync_status(session.id, "modified")
+                    total_updated += 1
+                else:
+                    total_skipped += 1
                 continue
             db.upsert_session(
                 id=session.id, tool=session.tool, project=session.project,
@@ -108,7 +126,14 @@ def import_sessions(
             )
             total_imported += 1
 
-    console.print(f"[green]Imported: {total_imported}[/green] | Skipped: {total_skipped}")
+    if quiet and total_imported == 0 and total_updated == 0:
+        return
+
+    parts = [f"[green]Imported: {total_imported}[/green]"]
+    if total_updated:
+        parts.append(f"[cyan]Updated: {total_updated}[/cyan]")
+    parts.append(f"Skipped: {total_skipped}")
+    console.print(" | ".join(parts))
 
 
 @app.command("list")
@@ -164,8 +189,18 @@ def show_session(
     db = _get_db()
     session = db.get_session(id)
     if not session:
+        # Check if prefix matches multiple sessions
+        matches = db.find_sessions_by_prefix(id)
+        if len(matches) > 1:
+            console.print(f"[yellow]Ambiguous ID prefix '{id}', matches {len(matches)} sessions:[/yellow]")
+            for m in matches:
+                console.print(f"  {m['id'][:16]}  {m['project']}")
+            raise typer.Exit(1)
         console.print(f"[red]Session not found: {id}[/red]")
         raise typer.Exit(1)
+
+    # Use resolved full ID for all subsequent operations
+    id = session["id"]
 
     if raw:
         source = Path(session["source_path"])
@@ -228,16 +263,18 @@ def tag_session(
 ):
     """Add or remove tags on a session."""
     db = _get_db()
-    if not db.session_exists(id):
+    full_id = db.resolve_id(id)
+    if not full_id:
         console.print(f"[red]Session not found: {id}[/red]")
         raise typer.Exit(1)
+    id = full_id
 
     if remove:
         db.remove_tag(id, remove)
-        console.print(f"[green]Removed tag '{remove}' from {id}[/green]")
+        console.print(f"[green]Removed tag '{remove}' from {id[:12]}[/green]")
     elif tags:
         db.add_tags(id, tags)
-        console.print(f"[green]Added tags {tags} to {id}[/green]")
+        console.print(f"[green]Added tags {tags} to {id[:12]}[/green]")
 
     current = db.get_tags(id)
     console.print(f"Current tags: {', '.join(current) if current else '(none)'}")
@@ -266,8 +303,9 @@ def delete_session(
     if not session:
         console.print(f"[red]Session not found: {id}[/red]")
         raise typer.Exit(1)
+    id = session["id"]  # resolve to full ID
 
-    confirm = typer.confirm(f"Delete session {id}?")
+    confirm = typer.confirm(f"Delete session {id[:12]}?")
     if not confirm:
         return
 
