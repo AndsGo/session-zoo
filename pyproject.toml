@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "session-zoo"
-version = "0.1.0"
+version = "0.1.1rc1"
 description = "AI development session recorder — save and sync sessions to GitHub"
 readme = "README.md"
 license = "MIT"
