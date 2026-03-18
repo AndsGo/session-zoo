@@ -64,8 +64,25 @@ class SessionDB:
 
     def get_session(self, id: str) -> dict | None:
         conn = self._get_conn()
+        # Try exact match first
         row = conn.execute("SELECT * FROM sessions WHERE id = ?", (id,)).fetchone()
-        return dict(row) if row else None
+        if row:
+            return dict(row)
+        # Fall back to prefix match
+        rows = conn.execute(
+            "SELECT * FROM sessions WHERE id LIKE ?", (id + "%",)
+        ).fetchall()
+        if len(rows) == 1:
+            return dict(rows[0])
+        return None  # 0 or multiple matches
+
+    def find_sessions_by_prefix(self, prefix: str) -> list[dict]:
+        """Return all sessions matching an ID prefix."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM sessions WHERE id LIKE ?", (prefix + "%",)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def list_sessions(self, *, project: str | None = None,
                       tag: str | None = None,
@@ -160,3 +177,8 @@ class SessionDB:
 
     def session_exists(self, id: str) -> bool:
         return self.get_session(id) is not None
+
+    def resolve_id(self, id: str) -> str | None:
+        """Resolve a (possibly prefix) ID to the full session ID."""
+        session = self.get_session(id)
+        return session["id"] if session else None
