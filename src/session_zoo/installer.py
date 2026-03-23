@@ -55,9 +55,13 @@ def install_hook(claude_dir: Path) -> bool:
 
     # Check for duplicate
     for entry in session_start:
-        if "zoo import" in entry.get("command", ""):
-            return False
+        for hook in entry.get("hooks", []):
+            if "zoo import" in hook.get("command", ""):
+                return False
 
-    session_start.append({"command": _ZOO_HOOK_CMD})
+    session_start.append({
+        "matcher": "",
+        "hooks": [{"type": "command", "command": _ZOO_HOOK_CMD}],
+    })
     settings_path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
     return True

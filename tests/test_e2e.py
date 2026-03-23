@@ -273,7 +273,11 @@ class TestFirstTimeSetup:
         import json
         settings = json.loads(settings_path.read_text())
         hooks = settings["hooks"]["SessionStart"]
-        assert any("zoo import" in h["command"] for h in hooks)
+        assert any(
+            "zoo import" in hook.get("command", "")
+            for entry in hooks
+            for hook in entry.get("hooks", [])
+        )
 
     def test_init_skip_skills_flag(self, env):
         _run(["init", "--skip-skills"], env)

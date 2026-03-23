@@ -29,13 +29,32 @@ def test_install_skills_skips_existing(tmp_path):
     assert (target / "zoo-sync" / "SKILL.md").read_text() == "custom content"
 
 
+def _has_zoo_hook(hooks_list):
+    """检查 hooks 列表中是否包含 zoo import hook。"""
+    for entry in hooks_list:
+        for hook in entry.get("hooks", []):
+            if "zoo import" in hook.get("command", ""):
+                return True
+    return False
+
+
+def _count_zoo_hooks(hooks_list):
+    """统计 hooks 列表中 zoo import hook 的数量。"""
+    count = 0
+    for entry in hooks_list:
+        for hook in entry.get("hooks", []):
+            if "zoo import" in hook.get("command", ""):
+                count += 1
+    return count
+
+
 def test_install_hook_creates_settings(tmp_path):
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir()
     install_hook(claude_dir)
     settings = json.loads((claude_dir / "settings.json").read_text())
     hooks = settings["hooks"]["SessionStart"]
-    assert any("zoo import" in h["command"] for h in hooks)
+    assert _has_zoo_hook(hooks)
 
 
 def test_install_hook_merges_existing(tmp_path):
@@ -43,8 +62,12 @@ def test_install_hook_merges_existing(tmp_path):
     claude_dir.mkdir()
     existing = {
         "hooks": {
-            "SessionStart": [{"command": "echo hello"}],
-            "PreToolUse": [{"command": "echo pre"}],
+            "SessionStart": [
+                {"matcher": "", "hooks": [{"type": "command", "command": "echo hello"}]},
+            ],
+            "PreToolUse": [
+                {"matcher": "", "hooks": [{"type": "command", "command": "echo pre"}]},
+            ],
         },
         "other_key": "preserved",
     }
@@ -53,10 +76,10 @@ def test_install_hook_merges_existing(tmp_path):
     settings = json.loads((claude_dir / "settings.json").read_text())
     hooks = settings["hooks"]["SessionStart"]
     # Both original and zoo hook present
-    assert any("echo hello" in h["command"] for h in hooks)
-    assert any("zoo import" in h["command"] for h in hooks)
+    assert len(hooks) == 2
+    assert _has_zoo_hook(hooks)
     # Other hooks preserved
-    assert settings["hooks"]["PreToolUse"] == [{"command": "echo pre"}]
+    assert len(settings["hooks"]["PreToolUse"]) == 1
     # Other keys preserved
     assert settings["other_key"] == "preserved"
 
@@ -68,5 +91,4 @@ def test_install_hook_no_duplicate(tmp_path):
     install_hook(claude_dir)  # second call
     settings = json.loads((claude_dir / "settings.json").read_text())
     hooks = settings["hooks"]["SessionStart"]
-    zoo_hooks = [h for h in hooks if "zoo import" in h["command"]]
-    assert len(zoo_hooks) == 1  # no duplicate
+    assert _count_zoo_hooks(hooks) == 1  # no duplicate
