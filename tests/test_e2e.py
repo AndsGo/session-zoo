@@ -205,7 +205,9 @@ class TestFirstTimeSetup:
 
         result = _run(["config", "show"], env)
         assert result.exit_code == 0
-        assert str(env["remote"]) in result.stdout
+        # Rich console 可能在长路径中插入换行符，去除后再比较
+        stdout_flat = result.stdout.replace("\n", "")
+        assert str(env["remote"]) in stdout_flat
 
     def test_config_set_ai_key_masked(self, env):
         _run(["init"], env)

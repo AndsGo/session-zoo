@@ -32,7 +32,7 @@ class ClaudeCodeAdapter:
         return sorted(paths)
 
     def parse(self, path: Path) -> Session:
-        lines = path.read_text().strip().split("\n")
+        lines = path.read_text(encoding="utf-8").strip().split("\n")
         records = [json.loads(line) for line in lines if line.strip()]
 
         session_id = None
@@ -133,7 +133,7 @@ class ClaudeCodeAdapter:
         """Extract project name from the session's cwd field if available,
         otherwise fall back to the last segment of the encoded directory name."""
         try:
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -153,14 +153,18 @@ class ClaudeCodeAdapter:
 
     def _encode_project_path(self, cwd: str) -> str:
         # Claude Code encodes "/home/user/project" as "-home-user-project"
-        return "-" + cwd.strip("/").replace("/", "-")
+        # Windows 路径需要先统一分隔符，并去除驱动器号中的冒号
+        normalized = cwd.replace("\\", "/")
+        # 去除驱动器号冒号 (e.g., "C:/Users" -> "C/Users")
+        normalized = normalized.replace(":", "")
+        return "-" + normalized.strip("/").replace("/", "-")
 
     def _match_project(self, dir_name: str, project: str) -> bool:
         return project.lower() in dir_name.lower()
 
     def _get_file_start_time(self, path: Path) -> datetime | None:
         try:
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 first_line = f.readline()
             record = json.loads(first_line)
             ts_str = record.get("timestamp")

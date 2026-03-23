@@ -230,7 +230,7 @@ def show_session(
     if raw:
         source = Path(session["source_path"])
         if source.exists():
-            console.print(source.read_text())
+            console.print(source.read_text(encoding="utf-8"))
         else:
             console.print(f"[red]Source file not found: {source}[/red]")
         return

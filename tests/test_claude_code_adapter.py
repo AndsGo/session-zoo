@@ -58,6 +58,7 @@ def test_get_restore_path(sample_claude_session):
     paths = adapter.discover()
     session = adapter.parse(paths[0])
     restore_path = adapter.get_restore_path(session)
-    assert str(restore_path).endswith(
+    # 使用 PurePosixPath 格式比较，避免 Windows 反斜杠问题
+    assert restore_path.as_posix().endswith(
         ".claude/projects/-home-user-my-project/test-session-001.jsonl"
     )

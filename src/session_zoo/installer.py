@@ -46,7 +46,7 @@ def install_hook(claude_dir: Path) -> bool:
     settings_path = claude_dir / "settings.json"
 
     if settings_path.exists():
-        settings = json.loads(settings_path.read_text())
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
     else:
         settings = {}
 
@@ -59,5 +59,5 @@ def install_hook(claude_dir: Path) -> bool:
             return False
 
     session_start.append({"command": _ZOO_HOOK_CMD})
-    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
     return True
