@@ -883,3 +883,39 @@ def test_import_does_not_override_manual_title(
     row = db.get_session("test-session-001")
     assert row["title"] == "Manual!"
     assert row["title_source"] == "manual"
+
+
+def test_summarize_writes_title_from_summary(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    fake_summary = (
+        "## Session Summary\n\n"
+        "**Title:** Refactor login flow\n\n"
+        "**Summary:** ...\n"
+    )
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir), \
+         patch("session_zoo.summarizer.generate_summary", return_value=fake_summary):
+        result = runner.invoke(app, ["summarize", "test-session-001",
+                                     "--provider", "claude-code"])
+    assert result.exit_code == 0
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    row = db.get_session("test-session-001")
+    assert row["title"] == "Refactor login flow"
+    assert row["title_source"] == "summary"
+
+
+def test_summarize_does_not_override_manual_title(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    db.update_title("test-session-001", "Manual!", "manual")
+    fake_summary = "**Title:** Auto title\n\n**Summary:** ..."
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir), \
+         patch("session_zoo.summarizer.generate_summary", return_value=fake_summary):
+        runner.invoke(app, ["summarize", "test-session-001",
+                            "--provider", "claude-code"])
+    row = db.get_session("test-session-001")
+    assert row["title"] == "Manual!"
+    assert row["title_source"] == "manual"

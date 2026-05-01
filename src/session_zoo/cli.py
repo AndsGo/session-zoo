@@ -501,6 +501,10 @@ def summarize(
                 model=model,
             )
             db.update_summary(s["id"], summary)
+            from session_zoo.summarizer import parse_title_from_summary
+            t = parse_title_from_summary(summary)
+            if t:
+                db.update_title(s["id"], t, "summary")
             console.print("[green]done[/green]")
             count += 1
         except RuntimeError as e:
