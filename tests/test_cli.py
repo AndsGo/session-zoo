@@ -689,12 +689,14 @@ def test_restore_filter_by_project(tmp_path, sample_claude_session):
 
 def test_title_show_when_unset(tmp_path, sample_claude_session):
     config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
-    # After import, title is auto-populated from first-message
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    db.clear_title("test-session-001")  # explicitly clear to test the unset case
     with patch("session_zoo.cli._config_dir", return_value=config_dir), \
          patch("session_zoo.cli._claude_dir", return_value=claude_dir):
         result = runner.invoke(app, ["title", "test-session-001"])
     assert result.exit_code == 0
-    assert "Fix the login bug" in result.stdout
+    assert "(untitled)" in result.stdout
 
 
 def test_title_set_manual(tmp_path, sample_claude_session):
@@ -797,13 +799,15 @@ def test_list_shows_title_column(tmp_path, sample_claude_session):
 
 def test_list_shows_untitled_when_missing(tmp_path, sample_claude_session):
     config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    db.clear_title("test-session-001")
     with patch("session_zoo.cli._config_dir", return_value=config_dir), \
          patch("session_zoo.cli._claude_dir", return_value=claude_dir):
         result = runner.invoke(app, ["list"])
     assert result.exit_code == 0
-    # After import, title is auto-populated from first-message.
-    # Rich may wrap the title across lines in the table, so check for a fragment.
-    assert "login bug" in result.stdout
+    # Rich may truncate "(untitled)" as "(untitle" in narrow columns
+    assert "(untitle" in result.stdout
 
 
 def test_show_displays_title_and_source(tmp_path, sample_claude_session):
@@ -821,12 +825,14 @@ def test_show_displays_title_and_source(tmp_path, sample_claude_session):
 
 def test_show_displays_untitled_when_no_title(tmp_path, sample_claude_session):
     config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    db.clear_title("test-session-001")
     with patch("session_zoo.cli._config_dir", return_value=config_dir), \
          patch("session_zoo.cli._claude_dir", return_value=claude_dir):
         result = runner.invoke(app, ["show", "test-session-001"])
     assert result.exit_code == 0
-    # After import, title is auto-populated from first-message
-    assert "Fix the login bug" in result.stdout
+    assert "untitled" in result.stdout.lower()
 
 
 def test_import_populates_title_from_ai_title(
