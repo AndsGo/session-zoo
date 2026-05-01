@@ -187,3 +187,90 @@ def test_init_adds_title_columns_on_existing_db(tmp_path):
     conn.close()
     assert "title" in cols
     assert "title_source" in cols
+
+
+def _seed_session(db, sid="s1"):
+    db.upsert_session(
+        id=sid, tool="claude-code", project="p",
+        source_path=f"/tmp/{sid}.jsonl",
+        started_at=datetime(2026, 3, 10, tzinfo=timezone.utc),
+        ended_at=None, model="m", total_tokens=0, message_count=0,
+    )
+
+
+def test_update_title_writes_when_no_existing_title(tmp_path):
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    assert db.update_title("s1", "First title", "ai-title") is True
+    row = db.get_session("s1")
+    assert row["title"] == "First title"
+    assert row["title_source"] == "ai-title"
+
+
+def test_update_title_priority_guard_blocks_lower(tmp_path):
+    """manual (1) cannot be overwritten by summary (2)."""
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    db.update_title("s1", "Manual", "manual")
+    assert db.update_title("s1", "Auto", "summary") is False
+    row = db.get_session("s1")
+    assert row["title"] == "Manual"
+    assert row["title_source"] == "manual"
+
+
+def test_update_title_priority_guard_allows_higher(tmp_path):
+    """summary (2) can overwrite manual? No — but manual can overwrite summary."""
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    db.update_title("s1", "Auto", "summary")
+    assert db.update_title("s1", "Manual", "manual") is True
+    row = db.get_session("s1")
+    assert row["title"] == "Manual"
+    assert row["title_source"] == "manual"
+
+
+def test_update_title_priority_first_message_to_ai_title(tmp_path):
+    """ai-title (3) overwrites first-message (4)."""
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    db.update_title("s1", "ls", "first-message")
+    assert db.update_title("s1", "Real title", "ai-title") is True
+    row = db.get_session("s1")
+    assert row["title_source"] == "ai-title"
+
+
+def test_update_title_priority_ai_title_blocks_first_message(tmp_path):
+    """first-message (4) cannot overwrite ai-title (3)."""
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    db.update_title("s1", "Real title", "ai-title")
+    assert db.update_title("s1", "ls", "first-message") is False
+    row = db.get_session("s1")
+    assert row["title"] == "Real title"
+    assert row["title_source"] == "ai-title"
+
+
+def test_update_title_same_source_allowed_for_refresh(tmp_path):
+    """Re-running summarize should refresh the summary-derived title."""
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    db.update_title("s1", "Old", "summary")
+    assert db.update_title("s1", "New", "summary") is True
+    row = db.get_session("s1")
+    assert row["title"] == "New"
+
+
+def test_update_title_rejects_empty(tmp_path):
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    assert db.update_title("s1", "", "manual") is False
+    assert db.update_title("s1", "   ", "manual") is False
+    row = db.get_session("s1")
+    assert row["title"] is None

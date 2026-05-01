@@ -133,6 +133,14 @@ class SessionDB:
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
+    _TITLE_PRIORITY: dict[str | None, int] = {
+        "manual": 1,
+        "summary": 2,
+        "ai-title": 3,
+        "first-message": 4,
+        None: 5,
+    }
+
     def update_summary(self, id: str, summary: str) -> None:
         conn = self._get_conn()
         conn.execute(
@@ -140,6 +148,34 @@ class SessionDB:
             (summary, id),
         )
         conn.commit()
+
+    def update_title(self, id: str, title: str, source: str) -> bool:
+        """Write title only if `source` has equal-or-higher priority than the
+        existing title_source. Returns True if written, False if blocked.
+        Empty/whitespace title is rejected.
+        """
+        if not title or not title.strip():
+            return False
+        if source is None or source not in self._TITLE_PRIORITY:
+            raise ValueError(f"unknown title source: {source!r}")
+
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT title_source FROM sessions WHERE id = ?", (id,)
+        ).fetchone()
+        if row is None:
+            return False  # session not found
+
+        existing_source = row["title_source"]
+        if self._TITLE_PRIORITY[source] > self._TITLE_PRIORITY[existing_source]:
+            return False  # incoming has lower priority
+
+        conn.execute(
+            "UPDATE sessions SET title = ?, title_source = ? WHERE id = ?",
+            (title.strip(), source, id),
+        )
+        conn.commit()
+        return True
 
     def update_sync_status(self, id: str, status: str) -> None:
         conn = self._get_conn()
