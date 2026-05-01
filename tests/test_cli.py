@@ -689,11 +689,12 @@ def test_restore_filter_by_project(tmp_path, sample_claude_session):
 
 def test_title_show_when_unset(tmp_path, sample_claude_session):
     config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    # After import, title is auto-populated from first-message
     with patch("session_zoo.cli._config_dir", return_value=config_dir), \
          patch("session_zoo.cli._claude_dir", return_value=claude_dir):
         result = runner.invoke(app, ["title", "test-session-001"])
     assert result.exit_code == 0
-    assert "(untitled)" in result.stdout
+    assert "Fix the login bug" in result.stdout
 
 
 def test_title_set_manual(tmp_path, sample_claude_session):
@@ -800,7 +801,9 @@ def test_list_shows_untitled_when_missing(tmp_path, sample_claude_session):
          patch("session_zoo.cli._claude_dir", return_value=claude_dir):
         result = runner.invoke(app, ["list"])
     assert result.exit_code == 0
-    assert "(untitle" in result.stdout.lower()  # rich truncates "(untitled)"
+    # After import, title is auto-populated from first-message.
+    # Rich may wrap the title across lines in the table, so check for a fragment.
+    assert "login bug" in result.stdout
 
 
 def test_show_displays_title_and_source(tmp_path, sample_claude_session):
@@ -822,4 +825,55 @@ def test_show_displays_untitled_when_no_title(tmp_path, sample_claude_session):
          patch("session_zoo.cli._claude_dir", return_value=claude_dir):
         result = runner.invoke(app, ["show", "test-session-001"])
     assert result.exit_code == 0
-    assert "untitled" in result.stdout.lower()
+    # After import, title is auto-populated from first-message
+    assert "Fix the login bug" in result.stdout
+
+
+def test_import_populates_title_from_ai_title(
+    tmp_path, sample_claude_session_with_ai_title
+):
+    config_dir = tmp_path / ".session-zoo"
+    claude_dir = sample_claude_session_with_ai_title / ".claude"
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["import"])
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    row = db.get_session("test-session-001")
+    assert row["title"] == "Newest title"
+    assert row["title_source"] == "ai-title"
+
+
+def test_import_falls_back_to_first_message(tmp_path, sample_claude_session):
+    """Sample fixture has no ai-title; import should use first user message."""
+    config_dir = tmp_path / ".session-zoo"
+    claude_dir = sample_claude_session / ".claude"
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["import"])
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    row = db.get_session("test-session-001")
+    assert row["title"] == "Fix the login bug"
+    assert row["title_source"] == "first-message"
+
+
+def test_import_does_not_override_manual_title(
+    tmp_path, sample_claude_session_with_ai_title
+):
+    config_dir = tmp_path / ".session-zoo"
+    claude_dir = sample_claude_session_with_ai_title / ".claude"
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["import"])
+        from session_zoo.db import SessionDB
+        db = SessionDB(config_dir / "index.db"); db.init()
+        db.update_title("test-session-001", "Manual!", "manual")
+        # Re-import should not override
+        runner.invoke(app, ["import"])
+    row = db.get_session("test-session-001")
+    assert row["title"] == "Manual!"
+    assert row["title_source"] == "manual"

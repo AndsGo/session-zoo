@@ -38,6 +38,19 @@ def _get_db() -> SessionDB:
     return db
 
 
+def _apply_title_after_import(db, adapter, session, path):
+    """After import/update, populate title from ai-title or first-message
+    (priority guard prevents stomping manual/summary)."""
+    if hasattr(adapter, "extract_native_title"):
+        native = adapter.extract_native_title(path)
+        if native and db.update_title(session.id, native, "ai-title"):
+            return
+    if hasattr(adapter, "extract_first_message"):
+        first = adapter.extract_first_message(path)
+        if first:
+            db.update_title(session.id, first, "first-message")
+
+
 def _backfill_titles(db):
     from session_zoo.summarizer import parse_title_from_summary
 
@@ -168,6 +181,7 @@ def import_sessions(
                         model=session.model, total_tokens=session.total_tokens,
                         message_count=session.message_count,
                     )
+                    _apply_title_after_import(db, adapter, session, path)
                     # Mark as modified so next sync picks it up
                     if existing["sync_status"] == "synced":
                         db.update_sync_status(session.id, "modified")
@@ -182,6 +196,7 @@ def import_sessions(
                 model=session.model, total_tokens=session.total_tokens,
                 message_count=session.message_count,
             )
+            _apply_title_after_import(db, adapter, session, path)
             total_imported += 1
 
     if quiet and total_imported == 0 and total_updated == 0:
