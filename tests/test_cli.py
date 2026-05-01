@@ -162,7 +162,7 @@ def test_list_shows_sessions(tmp_path, sample_claude_session):
     assert result.exit_code == 0
     # Rich may truncate column values with "…"
     assert "my-proje" in result.stdout
-    assert "claude-co" in result.stdout
+    assert "claude-c" in result.stdout  # Tool column gets narrower when Title column is wider
 
 
 def test_list_filter_by_project(tmp_path, sample_claude_session):
@@ -779,3 +779,25 @@ def test_title_backfill_does_not_override_manual(
     row = db.get_session("test-session-001")
     assert row["title"] == "User picks this"
     assert row["title_source"] == "manual"
+
+
+def test_list_shows_title_column(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    db.update_title("test-session-001", "My specific title", "manual")
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "Title" in result.stdout  # column header
+    assert "My" in result.stdout  # value (rich may truncate)
+
+
+def test_list_shows_untitled_when_missing(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "(untitle" in result.stdout.lower()  # rich truncates "(untitled)"

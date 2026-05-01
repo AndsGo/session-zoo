@@ -220,10 +220,11 @@ def list_sessions(
     table.add_column("Date")
     table.add_column("Tokens", justify="right")
     table.add_column("Status")
-    table.add_column("Summary", max_width=40)
+    table.add_column("Title", max_width=50)
 
     for s in sessions:
         date = s["started_at"][:10] if s["started_at"] else "?"
+        title = (s.get("title") or "(untitled)")[:50]
         table.add_row(
             s["id"][:12],
             s["project"],
@@ -231,7 +232,7 @@ def list_sessions(
             date,
             f"{s['total_tokens']:,}" if s["total_tokens"] else "?",
             s["sync_status"],
-            (s["summary"] or "")[:40],
+            title,
         )
 
     console.print(table)
