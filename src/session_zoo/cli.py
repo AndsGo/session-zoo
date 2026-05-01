@@ -567,6 +567,8 @@ def sync(
             "message_count": s["message_count"], "summary": s.get("summary"),
             "tags": tags, "source_path": s["source_path"],
             "cwd": parsed.cwd,
+            "title": s.get("title"),
+            "title_source": s.get("title_source"),
         }
         sync_module.write_meta_json(
             repo_dir=repo_dir, tool=s["tool"], project=s["project"],

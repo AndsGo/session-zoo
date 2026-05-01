@@ -438,6 +438,25 @@ class TestSummarizeAndSync:
         md_files = list(repo_dir.rglob("sess-aaa-001.md"))
         assert len(md_files) == 1
 
+    def test_sync_writes_title_into_meta_json(self, env):
+        """Title and title_source must round-trip through meta.json."""
+        self._setup(env)
+
+        # Force a known title via the DB before syncing
+        from session_zoo.db import SessionDB
+        db = SessionDB(env["config_dir"] / "index.db")
+        db.init()
+        db.set_title_raw("sess-aaa-001", "Synced title", "manual")
+
+        result = _run(["sync"], env)
+        assert result.exit_code == 0, f"sync failed: {result.stdout}"
+
+        repo_dir = env["config_dir"] / "repo"
+        raw_meta = repo_dir / "raw" / "claude-code" / "my-webapp" / "sess-aaa-001.meta.json"
+        meta = json.loads(raw_meta.read_text(encoding="utf-8"))
+        assert meta["title"] == "Synced title"
+        assert meta["title_source"] == "manual"
+
     def test_sync_dry_run(self, env):
         self._setup(env)
         result = _run(["sync", "--dry-run"], env)
