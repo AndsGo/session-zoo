@@ -683,3 +683,49 @@ def test_restore_filter_by_project(tmp_path, sample_claude_session):
         result = runner.invoke(app, ["restore", "--project", "other-project"])
     assert result.exit_code == 0
     assert "Restored 0" in result.stdout
+
+
+# ─── title command ────────────────────────────────────────────────────────────
+
+def test_title_show_when_unset(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["title", "test-session-001"])
+    assert result.exit_code == 0
+    assert "(untitled)" in result.stdout
+
+
+def test_title_set_manual(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["title", "test-session-001", "My title"])
+    assert result.exit_code == 0
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    row = db.get_session("test-session-001")
+    assert row["title"] == "My title"
+    assert row["title_source"] == "manual"
+
+
+def test_title_reset_clears_both_fields(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    db.update_title("test-session-001", "X", "manual")
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["title", "test-session-001", "--reset"])
+    assert result.exit_code == 0
+    row = db.get_session("test-session-001")
+    assert row["title"] is None
+    assert row["title_source"] is None
+
+
+def test_title_unknown_id_exits_nonzero(tmp_path):
+    config_dir = _setup_config(tmp_path)
+    with patch("session_zoo.cli._config_dir", return_value=config_dir):
+        runner.invoke(app, ["init"])
+        result = runner.invoke(app, ["title", "nope"])
+    assert result.exit_code != 0

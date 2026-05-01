@@ -38,6 +38,11 @@ def _get_db() -> SessionDB:
     return db
 
 
+def _backfill_titles(db):
+    """Implemented in Task 8."""
+    raise NotImplementedError("backfill not yet implemented")
+
+
 @app.command()
 def init(
     skip_skills: bool = typer.Option(False, help="Skip skill installation"),
@@ -315,6 +320,49 @@ def list_tags():
         return
     for tag, count in tags:
         console.print(f"  {tag}: {count}")
+
+
+@app.command("title")
+def title_cmd(
+    id: Optional[str] = typer.Argument(None, help="Session ID (or prefix). Omit with --backfill."),
+    text: Optional[str] = typer.Argument(None, help="New title. Omit to display current."),
+    reset: bool = typer.Option(False, "--reset", help="Clear title and source."),
+    backfill: bool = typer.Option(False, "--backfill", help="Recompute titles for all sessions."),
+):
+    """Show, set, reset, or backfill a session's title."""
+    db = _get_db()
+
+    if backfill:
+        _backfill_titles(db)
+        return
+
+    if not id:
+        console.print("[red]Provide an ID, or use --backfill to scan all sessions.[/red]")
+        raise typer.Exit(1)
+
+    session = db.get_session(id)
+    if not session:
+        console.print(f"[red]Session not found: {id}[/red]")
+        raise typer.Exit(1)
+    full_id = session["id"]
+
+    if reset:
+        db.clear_title(full_id)
+        console.print(f"[green]Cleared title for {full_id[:12]}[/green]")
+        return
+
+    if text is not None:
+        ok = db.update_title(full_id, text, "manual")
+        if not ok:
+            console.print(f"[red]Failed to set title (empty or invalid).[/red]")
+            raise typer.Exit(1)
+        console.print(f"[green]Set title for {full_id[:12]}: {text}[/green]")
+        return
+
+    # No text and no flag → show current
+    title = session.get("title") or "(untitled)"
+    src = session.get("title_source") or "—"
+    console.print(f"{full_id[:12]}  {title}  [dim](source: {src})[/dim]")
 
 
 @app.command("delete")
