@@ -283,6 +283,9 @@ def show_session(
 
     tags = db.get_tags(id)
     console.print(f"[bold]Session: {session['id']}[/bold]")
+    title = session.get("title") or "(untitled)"
+    src = session.get("title_source") or "—"
+    console.print(f"Title: {title}   [dim](source: {src})[/dim]")
     console.print(f"Tool: {session['tool']}")
     console.print(f"Project: {session['project']}")
     console.print(f"Model: {session['model']}")

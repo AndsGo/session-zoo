@@ -801,3 +801,25 @@ def test_list_shows_untitled_when_missing(tmp_path, sample_claude_session):
         result = runner.invoke(app, ["list"])
     assert result.exit_code == 0
     assert "(untitle" in result.stdout.lower()  # rich truncates "(untitled)"
+
+
+def test_show_displays_title_and_source(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    db.update_title("test-session-001", "Specific show title", "manual")
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["show", "test-session-001"])
+    assert result.exit_code == 0
+    assert "Specific show title" in result.stdout
+    assert "manual" in result.stdout  # source label appears
+
+
+def test_show_displays_untitled_when_no_title(tmp_path, sample_claude_session):
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["show", "test-session-001"])
+    assert result.exit_code == 0
+    assert "untitled" in result.stdout.lower()
