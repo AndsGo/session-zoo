@@ -28,3 +28,14 @@ zoo show <id> --raw         # Raw JSONL
 ```bash
 zoo search "authentication"
 ```
+
+## Set or Clear a Session Title
+
+`zoo list` shows a Title column. Titles are auto-derived (Claude Code's `aiTitle` → first user message → AI summary parse), but you can override:
+
+```bash
+zoo title <id>                  # show current title and source
+zoo title <id> "My title"       # set manual override
+zoo title <id> --reset          # clear, allow auto-derivation again
+zoo title --backfill            # one-shot: fill titles for all existing sessions
+```

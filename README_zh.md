@@ -64,6 +64,10 @@ zoo summarize <session-id>
 # 添加标签
 zoo tag <session-id> bugfix security
 
+# 设置或清除会话标题（覆盖自动派生的标题）
+zoo title <session-id> "修复登录 bug"
+zoo title <session-id> --reset
+
 # 同步到 GitHub
 zoo sync
 ```
@@ -87,17 +91,29 @@ zoo restore    # 恢复 .jsonl 文件到 ~/.claude/ 以支持 /resume
 | `zoo init` | 初始化配置 |
 | `zoo config show/set` | 查看或设置配置（repo, ai-key, ai-model） |
 | `zoo import` | 从 AI 工具导入新会话 |
-| `zoo list` | 列出会话（支持 --project, --tool, --tag, --since 筛选） |
-| `zoo show <id>` | 查看会话详情（--raw 原始数据, --markdown 渲染） |
+| `zoo list` | 列出会话，带 Title 列（支持 --project, --tool, --tag, --since 筛选） |
+| `zoo show <id>` | 查看会话详情，含标题和来源（--raw 原始数据, --markdown 渲染） |
 | `zoo search <query>` | 按摘要内容搜索 |
 | `zoo tag <id> [tags...]` | 添加/删除标签 |
 | `zoo tags` | 列出所有标签及数量 |
+| `zoo title <id> [text]` | 显示、设置或 `--reset` 会话标题；`--backfill` 一次性回填所有 session |
 | `zoo delete <id>` | 删除会话 |
 | `zoo summarize [id]` | 生成 AI 摘要（--provider auto/claude-code/codex/api） |
 | `zoo sync` | 同步到 GitHub（--dry-run 预览） |
 | `zoo clone` | 克隆会话仓库到本地 |
 | `zoo reindex` | 从仓库重建 SQLite 索引 |
 | `zoo restore` | 恢复会话文件到工具目录 |
+
+## 会话标题
+
+`zoo list` 显示 Title 列（完整 summary 仍然在 `zoo show <id>` 里）。标题按以下优先级派生：
+
+1. **manual** — 通过 `zoo title <id> "..."` 手动设置
+2. **summary** — 从 AI 生成的 summary 中解析 `**Title:**` 行（`zoo summarize`）
+3. **ai-title** — 从 jsonl 中读取 Claude Code 自动写入的 `aiTitle` 记录
+4. **first-message** — 第一条用户消息截断；与 `/resume` 的兜底一致
+
+`zoo import`、`zoo summarize`、`zoo title` 都遵守这个优先级——自动流程不会覆盖手动设置的标题。从旧版本升级上来，跑一次 `zoo title --backfill` 把存量 session 都填上。
 
 ## 摘要生成
 

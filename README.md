@@ -64,6 +64,10 @@ zoo summarize <session-id>
 # Tag sessions for organization
 zoo tag <session-id> bugfix security
 
+# Set or reset a session title (overrides auto-derived title)
+zoo title <session-id> "Fix the login bug"
+zoo title <session-id> --reset
+
 # Sync everything to GitHub
 zoo sync
 ```
@@ -87,17 +91,29 @@ zoo restore    # Restore .jsonl files to ~/.claude/ for /resume
 | `zoo init` | Initialize configuration |
 | `zoo config show/set` | View or set config (repo, ai-key, ai-model) |
 | `zoo import` | Import new sessions from AI tools |
-| `zoo list` | List sessions (filter by --project, --tool, --tag, --since) |
-| `zoo show <id>` | Show session details (--raw, --markdown) |
+| `zoo list` | List sessions with a Title column (filter by --project, --tool, --tag, --since) |
+| `zoo show <id>` | Show session details including title and source (--raw, --markdown) |
 | `zoo search <query>` | Search sessions by summary content |
 | `zoo tag <id> [tags...]` | Add/remove tags |
 | `zoo tags` | List all tags with counts |
+| `zoo title <id> [text]` | Show, set, or `--reset` a session title; `--backfill` populates titles for all sessions |
 | `zoo delete <id>` | Delete a session from index |
 | `zoo summarize [id]` | Generate AI summaries (--provider auto/claude-code/codex/api) |
 | `zoo sync` | Sync sessions to GitHub (--dry-run) |
 | `zoo clone` | Clone session repo to local |
 | `zoo reindex` | Rebuild SQLite index from repo |
 | `zoo restore` | Restore session files to tool directories |
+
+## Session Titles
+
+`zoo list` shows a Title column (full summary remains in `zoo show <id>`). Titles are resolved with this priority:
+
+1. **manual** — set via `zoo title <id> "..."`
+2. **summary** — parsed from `**Title:**` in the AI-generated summary (`zoo summarize`)
+3. **ai-title** — Claude Code's native `aiTitle` record from the jsonl, written automatically as you chat
+4. **first-message** — first user message, truncated; mirrors `/resume`'s fallback
+
+`zoo import`, `zoo summarize`, and `zoo title` all respect the priority — automated processes never overwrite a manual title. After upgrading from a previous version, run `zoo title --backfill` once to populate titles for existing sessions.
 
 ## Summarization Providers
 
