@@ -39,8 +39,36 @@ def _get_db() -> SessionDB:
 
 
 def _backfill_titles(db):
-    """Implemented in Task 8."""
-    raise NotImplementedError("backfill not yet implemented")
+    from session_zoo.summarizer import parse_title_from_summary
+
+    sessions = db.list_sessions()
+    updated = 0
+    for s in sessions:
+        sid = s["id"]
+        adapter = get_adapter(s["tool"], claude_dir=_claude_dir())
+        source = Path(s["source_path"])
+
+        # 1. Try summary parse (priority 2). No file read.
+        summary = s.get("summary")
+        if summary:
+            t = parse_title_from_summary(summary)
+            if t and db.update_title(sid, t, "summary"):
+                updated += 1
+                continue  # higher-priority succeeded; skip the rest
+
+        # 2. Try adapter native title (priority 3). Needs jsonl.
+        if source.exists():
+            native = adapter.extract_native_title(source)
+            if native and db.update_title(sid, native, "ai-title"):
+                updated += 1
+                continue
+
+            # 3. Fallback: first user message (priority 4).
+            first = adapter.extract_first_message(source)
+            if first and db.update_title(sid, first, "first-message"):
+                updated += 1
+
+    console.print(f"[green]Backfilled titles for {updated} session(s)[/green]")
 
 
 @app.command()

@@ -741,13 +741,41 @@ def test_title_reset_with_text_rejected(tmp_path, sample_claude_session):
     assert "Cannot combine" in result.stdout
 
 
-def test_title_backfill_stub_raises_until_task_8(tmp_path, sample_claude_session):
-    """Until Task 8 replaces the stub, --backfill must propagate
-    NotImplementedError so we don't silently ship a no-op."""
-    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+def test_title_backfill_fills_untitled_sessions(
+    tmp_path, sample_claude_session_with_ai_title
+):
+    """Backfill should pick up ai-title from jsonl when title was unset."""
+    config_dir = tmp_path / ".session-zoo"
+    claude_dir = sample_claude_session_with_ai_title / ".claude"
     with patch("session_zoo.cli._config_dir", return_value=config_dir), \
          patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["import"])
+        from session_zoo.db import SessionDB
+        db = SessionDB(config_dir / "index.db"); db.init()
+        db.clear_title("test-session-001")  # force unset
         result = runner.invoke(app, ["title", "--backfill"])
-    # NotImplementedError → typer.testing surfaces it via result.exception
-    assert result.exit_code != 0
-    assert isinstance(result.exception, NotImplementedError)
+
+    assert result.exit_code == 0
+    row = db.get_session("test-session-001")
+    assert row["title"] == "Newest title"
+    assert row["title_source"] == "ai-title"
+
+
+def test_title_backfill_does_not_override_manual(
+    tmp_path, sample_claude_session_with_ai_title
+):
+    config_dir = tmp_path / ".session-zoo"
+    claude_dir = sample_claude_session_with_ai_title / ".claude"
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        runner.invoke(app, ["init"])
+        runner.invoke(app, ["import"])
+        from session_zoo.db import SessionDB
+        db = SessionDB(config_dir / "index.db"); db.init()
+        db.update_title("test-session-001", "User picks this", "manual")
+        runner.invoke(app, ["title", "--backfill"])
+
+    row = db.get_session("test-session-001")
+    assert row["title"] == "User picks this"
+    assert row["title_source"] == "manual"
