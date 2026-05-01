@@ -149,3 +149,43 @@ def test_list_all_tags(tmp_path):
     db.add_tags("s2", ["bugfix"])
     tags = db.list_all_tags()
     assert tags == [("bugfix", 2), ("security", 1)]
+
+
+import sqlite3
+
+
+def test_init_adds_title_columns_on_existing_db(tmp_path):
+    """Simulate an old DB without title columns; init() should add them idempotently."""
+    db_path = tmp_path / "old.db"
+    # 1) Build a legacy schema (no title columns)
+    conn = sqlite3.connect(str(db_path))
+    conn.executescript("""
+        CREATE TABLE sessions (
+            id TEXT PRIMARY KEY,
+            tool TEXT NOT NULL,
+            project TEXT NOT NULL,
+            source_path TEXT NOT NULL,
+            started_at TEXT,
+            ended_at TEXT,
+            model TEXT,
+            total_tokens INTEGER,
+            message_count INTEGER,
+            summary TEXT,
+            sync_status TEXT DEFAULT 'pending',
+            synced_at TEXT
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+    # 2) Run init() — should add the new columns without error
+    db = SessionDB(db_path)
+    db.init()
+    db.init()  # second call must also be a no-op (idempotent)
+
+    # 3) Verify columns exist by inserting a row that uses them
+    conn = sqlite3.connect(str(db_path))
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+    conn.close()
+    assert "title" in cols
+    assert "title_source" in cols

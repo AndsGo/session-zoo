@@ -31,7 +31,9 @@ class SessionDB:
                 message_count INTEGER,
                 summary TEXT,
                 sync_status TEXT DEFAULT 'pending',
-                synced_at TEXT
+                synced_at TEXT,
+                title TEXT,
+                title_source TEXT
             );
             CREATE TABLE IF NOT EXISTS tags (
                 session_id TEXT REFERENCES sessions(id) ON DELETE CASCADE,
@@ -39,6 +41,16 @@ class SessionDB:
                 PRIMARY KEY (session_id, tag)
             );
         """)
+        # Idempotent migrations for upgrading existing DBs
+        for sql in (
+            "ALTER TABLE sessions ADD COLUMN title TEXT",
+            "ALTER TABLE sessions ADD COLUMN title_source TEXT",
+        ):
+            try:
+                conn.execute(sql)
+            except sqlite3.OperationalError:
+                pass  # column already exists
+        conn.commit()
 
     def upsert_session(self, *, id: str, tool: str, project: str,
                         source_path: str, started_at: datetime | None,
