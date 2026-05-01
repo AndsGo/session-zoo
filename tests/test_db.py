@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from session_zoo.db import SessionDB
@@ -151,9 +152,6 @@ def test_list_all_tags(tmp_path):
     assert tags == [("bugfix", 2), ("security", 1)]
 
 
-import sqlite3
-
-
 def test_init_adds_title_columns_on_existing_db(tmp_path):
     """Simulate an old DB without title columns; init() should add them idempotently."""
     db_path = tmp_path / "old.db"
@@ -183,7 +181,7 @@ def test_init_adds_title_columns_on_existing_db(tmp_path):
     db.init()
     db.init()  # second call must also be a no-op (idempotent)
 
-    # 3) Verify columns exist by inserting a row that uses them
+    # 3) Verify columns exist via schema inspection
     conn = sqlite3.connect(str(db_path))
     cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
     conn.close()
