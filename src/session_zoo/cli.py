@@ -332,6 +332,10 @@ def title_cmd(
     """Show, set, reset, or backfill a session's title."""
     db = _get_db()
 
+    if reset and text is not None:
+        console.print("[red]Cannot combine a title argument with --reset.[/red]")
+        raise typer.Exit(1)
+
     if backfill:
         _backfill_titles(db)
         return

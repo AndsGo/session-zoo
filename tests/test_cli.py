@@ -729,3 +729,25 @@ def test_title_unknown_id_exits_nonzero(tmp_path):
         runner.invoke(app, ["init"])
         result = runner.invoke(app, ["title", "nope"])
     assert result.exit_code != 0
+
+
+def test_title_reset_with_text_rejected(tmp_path, sample_claude_session):
+    """Combining --reset with a text argument should be rejected."""
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["title", "test-session-001", "New Title", "--reset"])
+    assert result.exit_code == 1
+    assert "Cannot combine" in result.stdout
+
+
+def test_title_backfill_stub_raises_until_task_8(tmp_path, sample_claude_session):
+    """Until Task 8 replaces the stub, --backfill must propagate
+    NotImplementedError so we don't silently ship a no-op."""
+    config_dir, claude_dir = _setup_db_with_session(tmp_path, sample_claude_session)
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        result = runner.invoke(app, ["title", "--backfill"])
+    # NotImplementedError → typer.testing surfaces it via result.exception
+    assert result.exit_code != 0
+    assert isinstance(result.exception, NotImplementedError)
