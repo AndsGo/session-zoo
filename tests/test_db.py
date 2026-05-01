@@ -284,3 +284,37 @@ def test_update_title_strips_whitespace_on_write(tmp_path):
     assert db.update_title("s1", "  Hello  ", "manual") is True
     row = db.get_session("s1")
     assert row["title"] == "Hello"
+
+
+def test_set_title_raw_bypasses_guard(tmp_path):
+    """reindex must be able to write a lower-priority source over higher."""
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    db.update_title("s1", "Manual", "manual")
+    db.set_title_raw("s1", "Restored", "ai-title")
+    row = db.get_session("s1")
+    assert row["title"] == "Restored"
+    assert row["title_source"] == "ai-title"
+
+
+def test_set_title_raw_accepts_none(tmp_path):
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    db.update_title("s1", "X", "manual")
+    db.set_title_raw("s1", None, None)
+    row = db.get_session("s1")
+    assert row["title"] is None
+    assert row["title_source"] is None
+
+
+def test_clear_title_resets_both_columns(tmp_path):
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    db.update_title("s1", "X", "manual")
+    db.clear_title("s1")
+    row = db.get_session("s1")
+    assert row["title"] is None
+    assert row["title_source"] is None

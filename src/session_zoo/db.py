@@ -177,6 +177,19 @@ class SessionDB:
         conn.commit()
         return True
 
+    def set_title_raw(self, id: str, title: str | None, source: str | None) -> None:
+        """Direct write, no priority check. Reserved for reindex-from-meta."""
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE sessions SET title = ?, title_source = ? WHERE id = ?",
+            (title, source, id),
+        )
+        conn.commit()
+
+    def clear_title(self, id: str) -> None:
+        """Reset both title and title_source to NULL."""
+        self.set_title_raw(id, None, None)
+
     def update_sync_status(self, id: str, status: str) -> None:
         conn = self._get_conn()
         now = datetime.now(timezone.utc).isoformat() if status == "synced" else None
