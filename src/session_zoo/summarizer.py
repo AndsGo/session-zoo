@@ -1,9 +1,12 @@
+import re
 import shutil
 import subprocess
 
 from session_zoo.models import Session
 
 MAX_PROMPT_CHARS = 80_000
+
+_TITLE_RE = re.compile(r"^\s*\*\*Title:\*\*\s*(.+?)\s*$", re.MULTILINE)
 
 SYSTEM_PROMPT = """You are summarizing an AI-assisted development session.
 Generate a concise summary with these sections:
@@ -148,3 +151,16 @@ def _summarize_via_api(prompt: str, api_key: str, model: str | None = None) -> s
         messages=[{"role": "user", "content": prompt}],
     )
     return response.content[0].text
+
+
+def parse_title_from_summary(summary: str) -> str | None:
+    """Extract the value after `**Title:**` from the AI-generated summary.
+    Returns None if no Title line or the value is empty/whitespace.
+    """
+    if not summary:
+        return None
+    m = _TITLE_RE.search(summary)
+    if not m:
+        return None
+    title = m.group(1).strip()
+    return title or None

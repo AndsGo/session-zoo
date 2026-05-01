@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 from session_zoo.models import Session, Message
 from session_zoo.summarizer import (
-    generate_summary, build_prompt, detect_provider,
+    generate_summary, build_prompt, detect_provider, parse_title_from_summary,
 )
 
 
@@ -155,3 +155,31 @@ def test_generate_summary_auto_prefers_api_key(mock_anthropic_cls):
 
     result = generate_summary(_make_session(), provider="auto", api_key="test-key")
     assert result == "API Summary"
+
+
+# --- parse_title_from_summary ---
+
+def test_parse_title_from_summary_standard():
+    summary = (
+        "## Session Summary\n\n"
+        "**Title:** Refactor auth middleware\n\n"
+        "**Summary:** ...\n"
+    )
+    assert parse_title_from_summary(summary) == "Refactor auth middleware"
+
+
+def test_parse_title_from_summary_chinese():
+    summary = "**Title:** session-zoo Windows 兼容性修复\n\n**Summary:** ..."
+    assert parse_title_from_summary(summary) == "session-zoo Windows 兼容性修复"
+
+
+def test_parse_title_from_summary_returns_none_when_missing():
+    assert parse_title_from_summary("just some random summary text") is None
+
+
+def test_parse_title_from_summary_strips_trailing_whitespace():
+    assert parse_title_from_summary("**Title:**   Hello   \n") == "Hello"
+
+
+def test_parse_title_from_summary_returns_none_for_empty_value():
+    assert parse_title_from_summary("**Title:**   \n") is None
