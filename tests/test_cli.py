@@ -919,3 +919,73 @@ def test_summarize_does_not_override_manual_title(tmp_path, sample_claude_sessio
     row = db.get_session("test-session-001")
     assert row["title"] == "Manual!"
     assert row["title_source"] == "manual"
+
+
+def test_reindex_restores_title_from_meta(tmp_path):
+    """Build a synthetic repo with a meta.json containing title fields,
+    then reindex and verify the title lands in the DB via set_title_raw."""
+    config_dir = tmp_path / ".session-zoo"
+    repo_dir = config_dir / "repo"
+    raw = repo_dir / "raw" / "claude-code" / "my-proj"
+    raw.mkdir(parents=True)
+    (raw / "abc123.jsonl").write_text(
+        '{"type":"user","message":{"role":"user","content":"hi"},"sessionId":"abc123"}\n',
+        encoding="utf-8",
+    )
+    (raw / "abc123.meta.json").write_text(json.dumps({
+        "session_id": "abc123",
+        "tool": "claude-code",
+        "project": "my-proj",
+        "started_at": "2026-03-10T10:00:00+00:00",
+        "ended_at": "2026-03-10T10:30:00+00:00",
+        "model": "claude-opus-4-6",
+        "total_tokens": 100,
+        "message_count": 1,
+        "summary": None,
+        "tags": [],
+        "title": "Restored title",
+        "title_source": "manual",
+    }), encoding="utf-8")
+    (config_dir / "config.toml").write_text(
+        f'repo = "{repo_dir.as_posix()}"\n'
+    )
+
+    with patch("session_zoo.cli._config_dir", return_value=config_dir):
+        runner.invoke(app, ["init"])
+        result = runner.invoke(app, ["reindex"])
+    assert result.exit_code == 0
+
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    row = db.get_session("abc123")
+    assert row["title"] == "Restored title"
+    assert row["title_source"] == "manual"
+
+
+def test_reindex_handles_missing_title_field(tmp_path):
+    """meta.json from old version (no title field) reindexes without error."""
+    config_dir = tmp_path / ".session-zoo"
+    repo_dir = config_dir / "repo"
+    raw = repo_dir / "raw" / "claude-code" / "my-proj"
+    raw.mkdir(parents=True)
+    (raw / "abc123.jsonl").write_text("{}\n", encoding="utf-8")
+    (raw / "abc123.meta.json").write_text(json.dumps({
+        "session_id": "abc123", "tool": "claude-code", "project": "my-proj",
+        "started_at": "2026-03-10T10:00:00+00:00",
+        "ended_at": "2026-03-10T10:30:00+00:00",
+        "model": "m", "total_tokens": 0, "message_count": 0,
+        "summary": None, "tags": [],
+    }), encoding="utf-8")
+    (config_dir / "config.toml").write_text(
+        f'repo = "{repo_dir.as_posix()}"\n'
+    )
+
+    with patch("session_zoo.cli._config_dir", return_value=config_dir):
+        runner.invoke(app, ["init"])
+        result = runner.invoke(app, ["reindex"])
+    assert result.exit_code == 0
+    from session_zoo.db import SessionDB
+    db = SessionDB(config_dir / "index.db"); db.init()
+    row = db.get_session("abc123")
+    assert row["title"] is None
+    assert row["title_source"] is None

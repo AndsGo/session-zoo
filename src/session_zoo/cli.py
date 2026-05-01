@@ -644,6 +644,12 @@ def reindex():
         if meta.get("tags"):
             db.add_tags(entry["session_id"], meta["tags"])
         db.update_sync_status(entry["session_id"], "synced")
+        if meta.get("title"):
+            db.set_title_raw(
+                entry["session_id"],
+                meta["title"],
+                meta.get("title_source"),
+            )
         count += 1
 
     console.print(f"[green]Reindexed {count} session(s) from repo[/green]")
