@@ -152,12 +152,11 @@ class ClaudeCodeAdapter:
         return parts[-1] if parts else dir_name
 
     def _encode_project_path(self, cwd: str) -> str:
-        # Claude Code encodes "/home/user/project" as "-home-user-project"
-        # Windows 路径需要先统一分隔符，并去除驱动器号中的冒号
-        normalized = cwd.replace("\\", "/")
-        # 去除驱动器号冒号 (e.g., "C:/Users" -> "C/Users")
-        normalized = normalized.replace(":", "")
-        return "-" + normalized.strip("/").replace("/", "-")
+        # Claude Code 把每个路径分隔符（/、\、Windows 盘符冒号）逐个替换为 "-"，
+        # 不折叠连续分隔符。例如：
+        #   /home/user/project → -home-user-project
+        #   D:\work\session-zoo → D--work-session-zoo
+        return cwd.replace("\\", "-").replace("/", "-").replace(":", "-")
 
     def _match_project(self, dir_name: str, project: str) -> bool:
         return project.lower() in dir_name.lower()

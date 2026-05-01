@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
+from pathlib import Path
+
 from session_zoo.adapters.claude_code import ClaudeCodeAdapter
+from session_zoo.models import Session
 
 
 def test_discover_finds_sessions(sample_claude_session):
@@ -61,4 +64,39 @@ def test_get_restore_path(sample_claude_session):
     # 使用 PurePosixPath 格式比较，避免 Windows 反斜杠问题
     assert restore_path.as_posix().endswith(
         ".claude/projects/-home-user-my-project/test-session-001.jsonl"
+    )
+
+
+def test_encode_project_path_posix(tmp_path):
+    adapter = ClaudeCodeAdapter(claude_dir=tmp_path)
+    assert adapter._encode_project_path("/home/user/my-project") == "-home-user-my-project"
+
+
+def test_encode_project_path_windows(tmp_path):
+    # 回归测试：Windows 盘符冒号必须替换为 "-"，而不是删除。
+    # Claude Code 真正的目录名是 "D--work-session-zoo"（双横线来自 ":\"），
+    # 旧实现会生成 "-D-work-session-zoo"，导致 /resume 找不到 restore 出来的会话。
+    adapter = ClaudeCodeAdapter(claude_dir=tmp_path)
+    assert adapter._encode_project_path("D:\\work\\session-zoo") == "D--work-session-zoo"
+    assert adapter._encode_project_path("C:\\Users\\Admin\\proj") == "C--Users-Admin-proj"
+
+
+def test_get_restore_path_windows_cwd(tmp_path):
+    # 回归测试：cwd 为 Windows 路径时，restore 应该写到 Claude Code 实际扫描的目录，
+    # 即 ~/.claude/projects/D--work-session-zoo/<id>.jsonl
+    adapter = ClaudeCodeAdapter(claude_dir=tmp_path / ".claude")
+    session = Session(
+        id="abc123",
+        tool="claude-code",
+        project="session-zoo",
+        source_path=Path("ignored.jsonl"),
+        started_at=None,
+        ended_at=None,
+        model="",
+        total_tokens=0,
+        cwd="D:\\work\\session-zoo",
+    )
+    restore_path = adapter.get_restore_path(session)
+    assert restore_path.as_posix().endswith(
+        ".claude/projects/D--work-session-zoo/abc123.jsonl"
     )
