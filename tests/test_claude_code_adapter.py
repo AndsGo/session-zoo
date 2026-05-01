@@ -100,3 +100,36 @@ def test_get_restore_path_windows_cwd(tmp_path):
     assert restore_path.as_posix().endswith(
         ".claude/projects/D--work-session-zoo/abc123.jsonl"
     )
+
+
+def test_extract_native_title_returns_ai_title(sample_claude_session_with_ai_title):
+    adapter = ClaudeCodeAdapter(
+        claude_dir=sample_claude_session_with_ai_title / ".claude"
+    )
+    paths = adapter.discover()
+    title = adapter.extract_native_title(paths[0])
+    # Must return the LAST ai-title record, not the first.
+    assert title == "Newest title"
+
+
+def test_extract_native_title_returns_none_when_absent(sample_claude_session):
+    adapter = ClaudeCodeAdapter(
+        claude_dir=sample_claude_session / ".claude"
+    )
+    paths = adapter.discover()
+    assert adapter.extract_native_title(paths[0]) is None
+
+
+def test_extract_native_title_handles_corrupted_lines(tmp_path):
+    """Single bad line should not abort scanning."""
+    project_dir = tmp_path / ".claude" / "projects" / "-x-y"
+    project_dir.mkdir(parents=True)
+    f = project_dir / "abc.jsonl"
+    f.write_text(
+        '{"type":"user","message":{"role":"user","content":"hi"}}\n'
+        'NOT JSON AT ALL\n'
+        '{"type":"ai-title","aiTitle":"After bad line","sessionId":"abc"}\n',
+        encoding="utf-8",
+    )
+    adapter = ClaudeCodeAdapter(claude_dir=tmp_path / ".claude")
+    assert adapter.extract_native_title(f) == "After bad line"

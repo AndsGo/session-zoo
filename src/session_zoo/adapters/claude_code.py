@@ -129,6 +129,30 @@ class ClaudeCodeAdapter:
         encoded = self._encode_project_path(session.cwd or f"/unknown/{session.project}")
         return self.claude_dir / "projects" / encoded / f"{session.id}.jsonl"
 
+    def extract_native_title(self, path: Path) -> str | None:
+        """Return the most recent `aiTitle` from the jsonl, or None if absent.
+        Claude Code may write multiple ai-title records as the conversation
+        evolves; the last one is the canonical title.
+        """
+        latest: str | None = None
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if record.get("type") == "ai-title":
+                        title = record.get("aiTitle")
+                        if title:
+                            latest = title
+        except OSError:
+            return None
+        return latest
+
     def _extract_project_name(self, path: Path) -> str:
         """Extract project name from the session's cwd field if available,
         otherwise fall back to the last segment of the encoded directory name."""

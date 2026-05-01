@@ -88,3 +88,21 @@ def sample_claude_session(tmp_path) -> Path:
         for msg in SAMPLE_MESSAGES:
             f.write(json.dumps(msg) + "\n")
     return tmp_path
+
+
+@pytest.fixture
+def sample_claude_session_with_ai_title(tmp_path) -> Path:
+    """Same as sample_claude_session, but the jsonl also contains two ai-title
+    records — the most recent one being the canonical title."""
+    project_dir = tmp_path / ".claude" / "projects" / "-home-user-my-project"
+    project_dir.mkdir(parents=True)
+    session_file = project_dir / "test-session-001.jsonl"
+    extra = [
+        {"type": "ai-title", "aiTitle": "Older title", "sessionId": "test-session-001"},
+        *SAMPLE_MESSAGES,
+        {"type": "ai-title", "aiTitle": "Newest title", "sessionId": "test-session-001"},
+    ]
+    with open(session_file, "w", encoding="utf-8") as f:
+        for msg in extra:
+            f.write(json.dumps(msg) + "\n")
+    return tmp_path
