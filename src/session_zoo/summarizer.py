@@ -114,6 +114,7 @@ def _summarize_via_claude(prompt: str, model: str | None = None) -> str:
         input=prompt,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=120,
         env=env,
     )
