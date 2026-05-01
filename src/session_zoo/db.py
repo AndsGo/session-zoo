@@ -149,7 +149,7 @@ class SessionDB:
         )
         conn.commit()
 
-    def update_title(self, id: str, title: str, source: str) -> bool:
+    def update_title(self, id: str, title: str, source: str | None) -> bool:
         """Write title only if `source` has equal-or-higher priority than the
         existing title_source. Returns True if written, False if blocked.
         Empty/whitespace title is rejected.

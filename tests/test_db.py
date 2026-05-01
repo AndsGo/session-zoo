@@ -221,7 +221,7 @@ def test_update_title_priority_guard_blocks_lower(tmp_path):
 
 
 def test_update_title_priority_guard_allows_higher(tmp_path):
-    """summary (2) can overwrite manual? No — but manual can overwrite summary."""
+    """manual (1) can overwrite summary (2)."""
     db = _make_db(tmp_path)
     db.init()
     _seed_session(db)
@@ -274,3 +274,13 @@ def test_update_title_rejects_empty(tmp_path):
     assert db.update_title("s1", "   ", "manual") is False
     row = db.get_session("s1")
     assert row["title"] is None
+
+
+def test_update_title_strips_whitespace_on_write(tmp_path):
+    """Stored title should be the trimmed value when caller passes padded input."""
+    db = _make_db(tmp_path)
+    db.init()
+    _seed_session(db)
+    assert db.update_title("s1", "  Hello  ", "manual") is True
+    row = db.get_session("s1")
+    assert row["title"] == "Hello"
