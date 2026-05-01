@@ -452,7 +452,7 @@ def summarize(
     Without --provider, auto-detects: claude CLI > codex CLI > API key.
     No API key needed if claude or codex CLI is installed.
     """
-    from session_zoo.summarizer import generate_summary, detect_provider
+    from session_zoo.summarizer import generate_summary, detect_provider, parse_title_from_summary
 
     cfg = _get_config()
     db = _get_db()
@@ -501,7 +501,6 @@ def summarize(
                 model=model,
             )
             db.update_summary(s["id"], summary)
-            from session_zoo.summarizer import parse_title_from_summary
             t = parse_title_from_summary(summary)
             if t:
                 db.update_title(s["id"], t, "summary")
