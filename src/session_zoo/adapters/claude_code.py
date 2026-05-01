@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -152,6 +153,42 @@ class ClaudeCodeAdapter:
         except OSError:
             return None
         return latest
+
+    def extract_first_message(self, path: Path) -> str | None:
+        """Return the first user message's text, whitespace-collapsed and
+        truncated to 80 chars. None if no user message or content is empty.
+        """
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if record.get("type") != "user":
+                        continue
+                    msg = record.get("message", {})
+                    content = msg.get("content", "")
+                    # Content may be string or list of {type, text}
+                    if isinstance(content, list):
+                        parts = [
+                            c.get("text", "") for c in content
+                            if isinstance(c, dict) and c.get("type") == "text"
+                        ]
+                        text = " ".join(parts)
+                    else:
+                        text = str(content)
+                    # Collapse all whitespace runs to single spaces, strip ends.
+                    text = re.sub(r"\s+", " ", text).strip()
+                    if not text:
+                        return None
+                    return text[:80]
+        except OSError:
+            return None
+        return None
 
     def _extract_project_name(self, path: Path) -> str:
         """Extract project name from the session's cwd field if available,

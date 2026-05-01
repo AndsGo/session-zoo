@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -133,3 +134,79 @@ def test_extract_native_title_handles_corrupted_lines(tmp_path):
     )
     adapter = ClaudeCodeAdapter(claude_dir=tmp_path / ".claude")
     assert adapter.extract_native_title(f) == "After bad line"
+
+
+def test_extract_first_message_returns_first_user_text(sample_claude_session):
+    adapter = ClaudeCodeAdapter(
+        claude_dir=sample_claude_session / ".claude"
+    )
+    paths = adapter.discover()
+    # Sample fixture's first user message is "Fix the login bug"
+    assert adapter.extract_first_message(paths[0]) == "Fix the login bug"
+
+
+def test_extract_first_message_collapses_whitespace_and_truncates(tmp_path):
+    project_dir = tmp_path / ".claude" / "projects" / "-x-y"
+    project_dir.mkdir(parents=True)
+    f = project_dir / "abc.jsonl"
+    long_text = "  hello\n\n   world  " + " padding" * 30
+    f.write_text(
+        json.dumps({
+            "type": "user",
+            "message": {"role": "user", "content": long_text},
+        }) + "\n",
+        encoding="utf-8",
+    )
+    adapter = ClaudeCodeAdapter(claude_dir=tmp_path / ".claude")
+    out = adapter.extract_first_message(f)
+    # Whitespace runs collapsed, leading/trailing stripped, ≤ 80 chars.
+    assert "  " not in out
+    assert "\n" not in out
+    assert out.startswith("hello world")
+    assert len(out) <= 80
+
+
+def test_extract_first_message_handles_list_content(tmp_path):
+    """user.message.content can be a list of {type:'text', text:...}."""
+    project_dir = tmp_path / ".claude" / "projects" / "-x-y"
+    project_dir.mkdir(parents=True)
+    f = project_dir / "abc.jsonl"
+    f.write_text(
+        json.dumps({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "text", "text": "Hello from list"}],
+            },
+        }) + "\n",
+        encoding="utf-8",
+    )
+    adapter = ClaudeCodeAdapter(claude_dir=tmp_path / ".claude")
+    assert adapter.extract_first_message(f) == "Hello from list"
+
+
+def test_extract_first_message_returns_none_when_no_user(tmp_path):
+    project_dir = tmp_path / ".claude" / "projects" / "-x-y"
+    project_dir.mkdir(parents=True)
+    f = project_dir / "abc.jsonl"
+    f.write_text(
+        json.dumps({"type": "system", "slug": "x"}) + "\n",
+        encoding="utf-8",
+    )
+    adapter = ClaudeCodeAdapter(claude_dir=tmp_path / ".claude")
+    assert adapter.extract_first_message(f) is None
+
+
+def test_extract_first_message_returns_none_for_empty_content(tmp_path):
+    project_dir = tmp_path / ".claude" / "projects" / "-x-y"
+    project_dir.mkdir(parents=True)
+    f = project_dir / "abc.jsonl"
+    f.write_text(
+        json.dumps({
+            "type": "user",
+            "message": {"role": "user", "content": "   \n   "},
+        }) + "\n",
+        encoding="utf-8",
+    )
+    adapter = ClaudeCodeAdapter(claude_dir=tmp_path / ".claude")
+    assert adapter.extract_first_message(f) is None
