@@ -97,6 +97,7 @@ zoo restore    # 恢复 .jsonl 文件到 ~/.claude/ 以支持 /resume
 | `zoo tag <id> [tags...]` | 添加/删除标签 |
 | `zoo tags` | 列出所有标签及数量 |
 | `zoo title <id> [text]` | 显示、设置或 `--reset` 会话标题；`--backfill` 一次性回填所有 session |
+| `zoo stats [id]` | 按模型统计 token 用量与缓存命中率（支持 `--project/--tool/--since` 过滤；`--backfill` 为所有 session 重算） |
 | `zoo delete <id>` | 删除会话 |
 | `zoo summarize [id]` | 生成 AI 摘要（--provider auto/claude-code/codex/api） |
 | `zoo sync` | 同步到 GitHub（--dry-run 预览） |
@@ -114,6 +115,21 @@ zoo restore    # 恢复 .jsonl 文件到 ~/.claude/ 以支持 /resume
 4. **first-message** — 第一条用户消息截断；与 `/resume` 的兜底一致
 
 `zoo import`、`zoo summarize`、`zoo title` 都遵守这个优先级——自动流程不会覆盖手动设置的标题。从旧版本升级上来，跑一次 `zoo title --backfill` 把存量 session 都填上。
+
+## 缓存统计
+
+`zoo stats` 按模型展示 token 用量和提示词缓存命中率，可跨 session 聚合
+（`--project`、`--tool`、`--since` 过滤），或用 `zoo stats <id>` 查看单个
+session。命中率 = `cache_read / (input + cache_read + cache_creation)`；
+`?` 表示没有输入 token 记录。
+
+用量数据在 `zoo import` 时采集，`zoo sync` 时写入 meta.json，`zoo reindex`
+时恢复。从旧版本升级后，运行一次 `zoo stats --backfill` 即可为已有 session
+补算用量。
+
+注意：本次同时修复了 token 重复计数问题（多 content block 的 assistant 消息
+此前按 block 重复累计），多数 session 的 `total_tokens` 会变小，下次
+`zoo import` 会将它们标记为待重新同步，属一次性成本。
 
 ## 摘要生成
 

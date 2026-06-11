@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `zoo stats` — per-session / per-model token usage and cache hit rates,
+  persisted through sync meta.json and reindex; `zoo stats --backfill` for
+  existing sessions
+
+### Fixed
+
+- Token usage deduplicated by `message.id` — `total_tokens` no longer counts
+  multi-block assistant messages once per block
+
 ## [0.1.0] - 2026-03-12
 
 ### Added

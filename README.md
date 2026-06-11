@@ -97,6 +97,7 @@ zoo restore    # Restore .jsonl files to ~/.claude/ for /resume
 | `zoo tag <id> [tags...]` | Add/remove tags |
 | `zoo tags` | List all tags with counts |
 | `zoo title <id> [text]` | Show, set, or `--reset` a session title; `--backfill` populates titles for all sessions |
+| `zoo stats [id]` | Per-model token usage and cache hit rates (`--project/--tool/--since` filters; `--backfill` recomputes for all sessions) |
 | `zoo delete <id>` | Delete a session from index |
 | `zoo summarize [id]` | Generate AI summaries (--provider auto/claude-code/codex/api) |
 | `zoo sync` | Sync sessions to GitHub (--dry-run) |
@@ -114,6 +115,21 @@ zoo restore    # Restore .jsonl files to ~/.claude/ for /resume
 4. **first-message** — first user message, truncated; mirrors `/resume`'s fallback
 
 `zoo import`, `zoo summarize`, and `zoo title` all respect the priority — automated processes never overwrite a manual title. After upgrading from a previous version, run `zoo title --backfill` once to populate titles for existing sessions.
+
+## Cache Stats
+
+`zoo stats` shows per-model token usage and prompt cache hit rates, aggregated
+across sessions (filter with `--project`, `--tool`, `--since`) or for a single
+session via `zoo stats <id>`. Hit rate = `cache_read / (input + cache_read +
+cache_creation)`; `?` means no input tokens were recorded.
+
+Usage data is collected on `zoo import`, written to meta.json on `zoo sync`,
+and restored by `zoo reindex`. After upgrading from a previous version, run
+`zoo stats --backfill` once to compute usage for existing sessions.
+
+Note: this release also fixes token double-counting (multi-block assistant
+messages were counted once per block), so `total_tokens` shrinks for most
+sessions and the next `zoo import` will mark them for re-sync. One-time cost.
 
 ## Summarization Providers
 
