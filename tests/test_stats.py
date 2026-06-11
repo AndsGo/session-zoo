@@ -227,3 +227,67 @@ def test_stats_backfill(cache_claude_env):
         assert result.exit_code == 0, result.stdout
         rows = db.get_model_usage("s-cache")
         assert {r["model"] for r in rows} == {"claude-fable-5", "claude-haiku-4-5"}
+
+
+# ---------- sync meta.json / reindex ----------
+
+BASE_META = {
+    "started_at": "2026-06-11T10:00:00+00:00",
+    "ended_at": "2026-06-11T10:05:00+00:00",
+    "model": "claude-fable-5",
+    "total_tokens": 1145,
+    "message_count": 4,
+}
+
+
+def _make_repo_entry(repo_dir, session_id, records, meta):
+    raw_dir = repo_dir / "raw" / "claude-code" / "proj"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    jsonl = raw_dir / f"{session_id}.jsonl"
+    with open(jsonl, "w", encoding="utf-8") as fh:
+        for r in records:
+            fh.write(json.dumps(r) + "\n")
+    (raw_dir / f"{session_id}.meta.json").write_text(
+        json.dumps(meta), encoding="utf-8")
+
+
+def test_reindex_restores_model_usage_from_meta(tmp_path):
+    config_dir = tmp_path / "sz-config"
+    repo_dir = config_dir / "repo"
+    meta = dict(BASE_META, model_usage=[{
+        "model": "claude-fable-5", "input_tokens": 100, "cache_read_tokens": 900,
+        "cache_creation_tokens": 50, "output_tokens": 40,
+    }])
+    _make_repo_entry(repo_dir, "s-meta", CACHE_RECORDS, meta)
+
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=tmp_path / ".claude"):
+        assert runner.invoke(app, ["init", "--skip-skills", "--skip-hooks"]).exit_code == 0
+        result = runner.invoke(app, ["reindex"])
+        assert result.exit_code == 0, result.stdout
+
+    db = SessionDB(config_dir / "index.db")
+    db.init()
+    rows = db.get_model_usage("s-meta")
+    assert rows == [{
+        "model": "claude-fable-5", "input_tokens": 100, "cache_read_tokens": 900,
+        "cache_creation_tokens": 50, "output_tokens": 40,
+    }]
+
+
+def test_reindex_falls_back_to_jsonl_when_meta_lacks_usage(tmp_path):
+    config_dir = tmp_path / "sz-config"
+    repo_dir = config_dir / "repo"
+    # Old-format meta: no model_usage key → reindex re-parses the JSONL.
+    _make_repo_entry(repo_dir, "s-old", CACHE_RECORDS, dict(BASE_META))
+
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=tmp_path / ".claude"):
+        assert runner.invoke(app, ["init", "--skip-skills", "--skip-hooks"]).exit_code == 0
+        result = runner.invoke(app, ["reindex"])
+        assert result.exit_code == 0, result.stdout
+
+    db = SessionDB(config_dir / "index.db")
+    db.init()
+    rows = db.get_model_usage("s-old")
+    assert {r["model"] for r in rows} == {"claude-fable-5", "claude-haiku-4-5"}

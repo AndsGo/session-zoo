@@ -104,3 +104,10 @@ def test_full_workflow(sample_claude_session, tmp_path):
         meta = json.loads(raw_meta.read_text())
         assert meta["tags"] == ["bugfix", "test"]
         assert "XSS" in meta["summary"]
+        assert meta["model_usage"] == [{
+            "model": "claude-opus-4-6",
+            "input_tokens": 300,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+            "output_tokens": 130,
+        }]

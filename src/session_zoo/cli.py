@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -654,6 +655,7 @@ def sync(
             "cwd": parsed.cwd,
             "title": s.get("title"),
             "title_source": s.get("title_source"),
+            "model_usage": db.get_model_usage(s["id"]),
         }
         sync_module.write_meta_json(
             repo_dir=repo_dir, tool=s["tool"], project=s["project"],
@@ -735,6 +737,25 @@ def reindex():
                 meta["title"],
                 meta.get("title_source"),
             )
+        if meta.get("model_usage"):
+            db.replace_model_usage(entry["session_id"], {
+                r["model"]: {
+                    "input": r["input_tokens"],
+                    "cache_read": r["cache_read_tokens"],
+                    "cache_creation": r["cache_creation_tokens"],
+                    "output": r["output_tokens"],
+                }
+                for r in meta["model_usage"]
+            })
+        else:
+            # Old meta files predate model_usage — recompute from the JSONL.
+            adapter = get_adapter(entry["tool"], claude_dir=_claude_dir())
+            try:
+                parsed = adapter.parse(entry["jsonl_path"])
+            except (json.JSONDecodeError, OSError):
+                parsed = None
+            if parsed and parsed.model_usage:
+                db.replace_model_usage(entry["session_id"], parsed.model_usage)
         count += 1
 
     console.print(f"[green]Reindexed {count} session(s) from repo[/green]")
