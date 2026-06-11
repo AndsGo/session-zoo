@@ -162,3 +162,68 @@ def test_model_usage_cascade_delete(db):
     })
     db.delete_session("s1")
     assert db.get_model_usage("s1") == []
+
+
+# ---------- CLI ----------
+
+from session_zoo.cli import _format_hit_rate
+
+
+def test_format_hit_rate():
+    assert _format_hit_rate({
+        "input_tokens": 100, "cache_read_tokens": 900, "cache_creation_tokens": 0,
+    }) == "90.0%"
+
+
+def test_format_hit_rate_zero_denominator():
+    assert _format_hit_rate({
+        "input_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0,
+    }) == "?"
+
+
+@pytest.fixture
+def cache_claude_env(tmp_path, cache_session_file):
+    """A fake ~/.claude + config dir housing the cache fixture session."""
+    claude_dir = tmp_path / ".claude"
+    proj = claude_dir / "projects" / "-home-user-proj"
+    proj.mkdir(parents=True)
+    shutil.copy2(cache_session_file, proj / "s-cache.jsonl")
+    config_dir = tmp_path / "sz-config"
+    return config_dir, claude_dir
+
+
+def test_stats_command_global_and_session(cache_claude_env):
+    config_dir, claude_dir = cache_claude_env
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        assert runner.invoke(app, ["init", "--skip-skills", "--skip-hooks"]).exit_code == 0
+        assert runner.invoke(app, ["import"]).exit_code == 0
+
+        result = runner.invoke(app, ["stats"])
+        assert result.exit_code == 0, result.stdout
+        # Rich may truncate cell values; assert on stable prefixes.
+        assert "claude-fa" in result.stdout
+        assert "85.7%" in result.stdout  # 900 / (100+900+50)
+
+        result = runner.invoke(app, ["stats", "s-cache"])
+        assert result.exit_code == 0, result.stdout
+        assert "claude-ha" in result.stdout
+
+
+def test_stats_backfill(cache_claude_env):
+    config_dir, claude_dir = cache_claude_env
+    with patch("session_zoo.cli._config_dir", return_value=config_dir), \
+         patch("session_zoo.cli._claude_dir", return_value=claude_dir):
+        assert runner.invoke(app, ["init", "--skip-skills", "--skip-hooks"]).exit_code == 0
+        assert runner.invoke(app, ["import"]).exit_code == 0
+
+        # Simulate a pre-upgrade DB: usage rows missing.
+        db = SessionDB(config_dir / "index.db")
+        db.init()
+        db.replace_model_usage("s-cache", {})
+        assert db.get_model_usage("s-cache") == []
+
+        result = runner.invoke(app, ["stats", "--backfill"])
+        assert result.exit_code == 0, result.stdout
+        rows = db.get_model_usage("s-cache")
+        assert {r["model"] for r in rows} == {"claude-fable-5", "claude-haiku-4-5"}

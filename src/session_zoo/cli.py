@@ -84,6 +84,55 @@ def _backfill_titles(db):
     console.print(f"[green]Backfilled titles for {updated} session(s)[/green]")
 
 
+def _format_hit_rate(row: dict) -> str:
+    denom = (row["input_tokens"] + row["cache_read_tokens"]
+             + row["cache_creation_tokens"])
+    if denom == 0:
+        return "?"
+    return f"{row['cache_read_tokens'] / denom:.1%}"
+
+
+def _stats_table(rows: list[dict], *, with_sessions: bool) -> Table:
+    table = Table()
+    table.add_column("Model", style="cyan")
+    if with_sessions:
+        table.add_column("Sessions", justify="right")
+    table.add_column("Input", justify="right")
+    table.add_column("Cache Read", justify="right")
+    table.add_column("Cache Write", justify="right")
+    table.add_column("Output", justify="right")
+    table.add_column("Hit Rate", justify="right")
+    for r in rows:
+        cells = [r["model"]]
+        if with_sessions:
+            cells.append(str(r["sessions"]))
+        cells += [
+            f"{r['input_tokens']:,}",
+            f"{r['cache_read_tokens']:,}",
+            f"{r['cache_creation_tokens']:,}",
+            f"{r['output_tokens']:,}",
+            _format_hit_rate(r),
+        ]
+        table.add_row(*cells)
+    return table
+
+
+def _backfill_model_usage(db):
+    sessions = db.list_sessions()
+    updated = 0
+    for s in sessions:
+        source = Path(s["source_path"])
+        if not source.exists():
+            console.print(f"[yellow]Skip {s['id'][:12]}: source file missing[/yellow]")
+            continue
+        adapter = get_adapter(s["tool"], claude_dir=_claude_dir())
+        parsed = adapter.parse(source)
+        db.replace_model_usage(s["id"], parsed.model_usage)
+        if parsed.model_usage:
+            updated += 1
+    console.print(f"[green]Backfilled model usage for {updated} session(s)[/green]")
+
+
 @app.command()
 def init(
     skip_skills: bool = typer.Option(False, help="Skip skill installation"),
@@ -182,6 +231,7 @@ def import_sessions(
                         message_count=session.message_count,
                     )
                     _apply_title_after_import(db, adapter, session, path)
+                    db.replace_model_usage(session.id, session.model_usage)
                     # Mark as modified so next sync picks it up
                     if existing["sync_status"] == "synced":
                         db.update_sync_status(session.id, "modified")
@@ -197,6 +247,7 @@ def import_sessions(
                 message_count=session.message_count,
             )
             _apply_title_after_import(db, adapter, session, path)
+            db.replace_model_usage(session.id, session.model_usage)
             total_imported += 1
 
     if quiet and total_imported == 0 and total_updated == 0:
@@ -367,6 +418,41 @@ def list_tags():
         return
     for tag, count in tags:
         console.print(f"  {tag}: {count}")
+
+
+@app.command("stats")
+def stats(
+    id: Optional[str] = typer.Argument(None, help="Session ID (omit for global stats)"),
+    project: Optional[str] = typer.Option(None, help="Filter by project"),
+    tool: Optional[str] = typer.Option(None, help="Filter by tool"),
+    since: Optional[str] = typer.Option(None, help="Filter by start date"),
+    backfill: bool = typer.Option(False, "--backfill", help="Recompute model usage for all sessions"),
+):
+    """Show per-model token usage and cache hit rates."""
+    db = _get_db()
+
+    if backfill:
+        _backfill_model_usage(db)
+        return
+
+    if id:
+        session = db.get_session(id)
+        if not session:
+            console.print(f"[red]Session not found: {id}[/red]")
+            raise typer.Exit(1)
+        rows = db.get_model_usage(session["id"])
+        if not rows:
+            console.print("No usage data for this session. Run 'zoo stats --backfill'.")
+            return
+        console.print(f"[bold]Session: {session['id'][:12]}[/bold]")
+        console.print(_stats_table(rows, with_sessions=False))
+        return
+
+    rows = db.aggregate_model_usage(project=project, tool=tool, since=since)
+    if not rows:
+        console.print("No usage data. Run 'zoo stats --backfill' to compute it for existing sessions.")
+        return
+    console.print(_stats_table(rows, with_sessions=True))
 
 
 @app.command("title")
