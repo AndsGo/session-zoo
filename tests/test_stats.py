@@ -99,3 +99,66 @@ def test_parse_records_without_message_id_each_count(sample_claude_session):
     assert session.model_usage["claude-opus-4-6"] == {
         "input": 300, "cache_read": 0, "cache_creation": 0, "output": 130,
     }
+
+
+# ---------- DB ----------
+
+@pytest.fixture
+def db(tmp_path):
+    d = SessionDB(tmp_path / "index.db")
+    d.init()
+    return d
+
+
+def _add_session(db, id, project="proj-a", tool="claude-code",
+                 started="2026-06-01T10:00:00+00:00"):
+    db.upsert_session(
+        id=id, tool=tool, project=project, source_path=f"/tmp/{id}.jsonl",
+        started_at=datetime.fromisoformat(started), ended_at=None,
+        model="claude-fable-5", total_tokens=0, message_count=0,
+    )
+
+
+def test_replace_model_usage_is_idempotent(db):
+    _add_session(db, "s1")
+    db.replace_model_usage("s1", {
+        "claude-fable-5": {"input": 100, "cache_read": 900, "cache_creation": 50, "output": 40},
+    })
+    db.replace_model_usage("s1", {
+        "claude-fable-5": {"input": 200, "cache_read": 800, "cache_creation": 0, "output": 10},
+    })
+    rows = db.get_model_usage("s1")
+    assert rows == [{
+        "model": "claude-fable-5", "input_tokens": 200, "cache_read_tokens": 800,
+        "cache_creation_tokens": 0, "output_tokens": 10,
+    }]
+
+
+def test_aggregate_model_usage_groups_and_filters(db):
+    _add_session(db, "s1", project="proj-a")
+    _add_session(db, "s2", project="proj-b")
+    db.replace_model_usage("s1", {
+        "claude-fable-5": {"input": 100, "cache_read": 900, "cache_creation": 0, "output": 40},
+    })
+    db.replace_model_usage("s2", {
+        "claude-fable-5": {"input": 50, "cache_read": 100, "cache_creation": 0, "output": 20},
+        "claude-haiku-4-5": {"input": 10, "cache_read": 0, "cache_creation": 0, "output": 5},
+    })
+    by_model = {r["model"]: r for r in db.aggregate_model_usage()}
+    assert by_model["claude-fable-5"]["sessions"] == 2
+    assert by_model["claude-fable-5"]["input_tokens"] == 150
+    assert by_model["claude-fable-5"]["cache_read_tokens"] == 1000
+    assert by_model["claude-haiku-4-5"]["sessions"] == 1
+
+    rows_a = db.aggregate_model_usage(project="proj-a")
+    assert len(rows_a) == 1
+    assert rows_a[0]["input_tokens"] == 100
+
+
+def test_model_usage_cascade_delete(db):
+    _add_session(db, "s1")
+    db.replace_model_usage("s1", {
+        "claude-fable-5": {"input": 1, "cache_read": 0, "cache_creation": 0, "output": 1},
+    })
+    db.delete_session("s1")
+    assert db.get_model_usage("s1") == []

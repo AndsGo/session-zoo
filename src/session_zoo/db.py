@@ -40,6 +40,15 @@ class SessionDB:
                 tag TEXT NOT NULL,
                 PRIMARY KEY (session_id, tag)
             );
+            CREATE TABLE IF NOT EXISTS model_usage (
+                session_id TEXT REFERENCES sessions(id) ON DELETE CASCADE,
+                model TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (session_id, model)
+            );
         """)
         # Idempotent migrations for upgrading existing DBs
         for sql in (
@@ -230,6 +239,63 @@ class SessionDB:
             "SELECT tag, COUNT(*) as cnt FROM tags GROUP BY tag ORDER BY cnt DESC, tag",
         ).fetchall()
         return [(r["tag"], r["cnt"]) for r in rows]
+
+    def replace_model_usage(self, session_id: str,
+                            usage: dict[str, dict[str, int]]) -> None:
+        """Replace all per-model usage rows for a session (idempotent)."""
+        conn = self._get_conn()
+        conn.execute("DELETE FROM model_usage WHERE session_id = ?", (session_id,))
+        for model, u in usage.items():
+            conn.execute(
+                """INSERT INTO model_usage
+                       (session_id, model, input_tokens, cache_read_tokens,
+                        cache_creation_tokens, output_tokens)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (session_id, model, u.get("input", 0), u.get("cache_read", 0),
+                 u.get("cache_creation", 0), u.get("output", 0)),
+            )
+        conn.commit()
+
+    def get_model_usage(self, session_id: str) -> list[dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT model, input_tokens, cache_read_tokens,
+                      cache_creation_tokens, output_tokens
+               FROM model_usage WHERE session_id = ? ORDER BY model""",
+            (session_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def aggregate_model_usage(self, *, project: str | None = None,
+                              tool: str | None = None,
+                              since: str | None = None) -> list[dict]:
+        conn = self._get_conn()
+        query = """SELECT mu.model,
+                          COUNT(DISTINCT mu.session_id) AS sessions,
+                          SUM(mu.input_tokens) AS input_tokens,
+                          SUM(mu.cache_read_tokens) AS cache_read_tokens,
+                          SUM(mu.cache_creation_tokens) AS cache_creation_tokens,
+                          SUM(mu.output_tokens) AS output_tokens
+                   FROM model_usage mu
+                   JOIN sessions s ON mu.session_id = s.id"""
+        conditions: list[str] = []
+        params: list = []
+        if project:
+            conditions.append("s.project = ?")
+            params.append(project)
+        if tool:
+            conditions.append("s.tool = ?")
+            params.append(tool)
+        if since:
+            conditions.append("s.started_at >= ?")
+            params.append(since)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += """ GROUP BY mu.model
+                     ORDER BY SUM(mu.input_tokens + mu.cache_read_tokens
+                                  + mu.cache_creation_tokens + mu.output_tokens) DESC"""
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
 
     def delete_session(self, id: str) -> None:
         conn = self._get_conn()
