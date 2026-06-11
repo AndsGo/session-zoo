@@ -44,6 +44,8 @@ class ClaudeCodeAdapter:
         total_input = 0
         total_output = 0
         timestamps: list[datetime] = []
+        model_usage: dict[str, dict[str, int]] = {}
+        seen_msg_ids: set[str] = set()
 
         for record in records:
             rec_type = record.get("type")
@@ -87,15 +89,35 @@ class ClaudeCodeAdapter:
                             "input": c.get("input", {}),
                         })
 
-            # Extract token usage
+            # Extract token usage. Claude Code writes one record per content
+            # block, so one message (message.id) may appear as several records
+            # carrying the same usage object — count it only once.
             usage = msg_data.get("usage")
             token_usage = None
             if usage:
-                inp = usage.get("input_tokens", 0) + usage.get("cache_creation_input_tokens", 0) + usage.get("cache_read_input_tokens", 0)
+                inp = usage.get("input_tokens", 0)
+                cache_read = usage.get("cache_read_input_tokens", 0)
+                cache_creation = usage.get("cache_creation_input_tokens", 0)
                 out = usage.get("output_tokens", 0)
-                total_input += inp
-                total_output += out
-                token_usage = {"input": inp, "output": out}
+                token_usage = {"input": inp + cache_read + cache_creation, "output": out}
+
+                msg_id = msg_data.get("id")
+                already_counted = msg_id is not None and msg_id in seen_msg_ids
+                if msg_id is not None:
+                    seen_msg_ids.add(msg_id)
+                if not already_counted:
+                    total_input += inp + cache_read + cache_creation
+                    total_output += out
+                    msg_model = msg_data.get("model")
+                    if msg_model and msg_model != "<synthetic>":
+                        mu = model_usage.setdefault(msg_model, {
+                            "input": 0, "cache_read": 0,
+                            "cache_creation": 0, "output": 0,
+                        })
+                        mu["input"] += inp
+                        mu["cache_read"] += cache_read
+                        mu["cache_creation"] += cache_creation
+                        mu["output"] += out
 
             # Extract model
             if model is None and msg_data.get("model"):
@@ -124,6 +146,7 @@ class ClaudeCodeAdapter:
             messages=messages,
             git_branch=git_branch if git_branch != "HEAD" else None,
             cwd=cwd,
+            model_usage=model_usage,
         )
 
     def get_restore_path(self, session: Session) -> Path:

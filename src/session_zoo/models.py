@@ -25,6 +25,8 @@ class Session:
     messages: list[Message] = field(default_factory=list)
     git_branch: str | None = None
     cwd: str | None = None
+    # model name -> {"input", "cache_read", "cache_creation", "output"}
+    model_usage: dict[str, dict[str, int]] = field(default_factory=dict)
 
     @property
     def message_count(self) -> int:
