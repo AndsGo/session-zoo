@@ -494,6 +494,48 @@ class TestSummarizeAndSync:
         result = _run(["list", "--status", "synced"], env)
         assert "sess-aaa" in result.stdout
 
+    def test_sync_falls_back_to_repo_raw_when_source_missing(self, env):
+        """A synced session whose local JSONL was cleaned up must still
+        re-sync metadata by parsing the raw copy already in the repo."""
+        self._setup(env)
+        _run(["sync"], env)
+
+        # Local source cleaned up (e.g. Claude Code purged old sessions)
+        source = (env["claude_dir"] / "projects" / "-home-user-my-webapp"
+                  / "sess-aaa-001.jsonl")
+        source.unlink()
+
+        # A metadata change marks the session modified
+        from session_zoo.db import SessionDB
+        db = SessionDB(env["config_dir"] / "index.db")
+        db.init()
+        db.update_summary("sess-aaa-001", "Summary added after cleanup")
+
+        result = _run(["sync"], env)
+        assert result.exit_code == 0, f"sync failed: {result.stdout}"
+        assert "Skip" not in result.stdout
+        assert "Synced sess-aaa-001" in result.stdout
+
+        raw_meta = (env["config_dir"] / "repo" / "raw" / "claude-code"
+                    / "my-webapp" / "sess-aaa-001.meta.json")
+        meta = json.loads(raw_meta.read_text(encoding="utf-8"))
+        assert meta["summary"] == "Summary added after cleanup"
+
+        # Status resolved back to synced — no longer stuck
+        result = _run(["list", "--status", "synced"], env)
+        assert "sess-aaa" in result.stdout
+
+    def test_sync_skips_when_source_and_repo_raw_both_missing(self, env):
+        """No local source and nothing in the repo: keep the skip warning."""
+        self._setup(env)
+        source = (env["claude_dir"] / "projects" / "-home-user-my-webapp"
+                  / "sess-aaa-001.jsonl")
+        source.unlink()
+
+        result = _run(["sync"], env)
+        assert result.exit_code == 0
+        assert "Skip sess-aaa-001" in result.stdout
+
     def test_sync_no_repo_configured(self, env):
         _run(["init"], env)
         _run(["import"], env)

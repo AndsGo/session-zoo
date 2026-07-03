@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- `zoo sync` no longer strands sessions whose local JSONL was cleaned up:
+  it falls back to the raw copy already in the repo, so metadata/markdown
+  updates still sync instead of skipping forever
+
 ## [0.2.0] - 2026-07-03
 
 ### Added

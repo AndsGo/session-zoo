@@ -634,14 +634,19 @@ def sync(
 
     for s in pending:
         source = Path(s["source_path"])
-        if not source.exists():
-            console.print(f"[yellow]Skip {s['id'][:12]}: source missing[/yellow]")
-            continue
-
-        sync_module.copy_raw_session(
-            repo_dir=repo_dir, source_path=source,
-            tool=s["tool"], project=s["project"], session_id=s["id"],
-        )
+        if source.exists():
+            sync_module.copy_raw_session(
+                repo_dir=repo_dir, source_path=source,
+                tool=s["tool"], project=s["project"], session_id=s["id"],
+            )
+        else:
+            # Local source cleaned up — fall back to the raw copy already in
+            # the repo so metadata/markdown updates still sync.
+            source = (repo_dir / "raw" / s["tool"] / s["project"]
+                      / f"{s['id']}.jsonl")
+            if not source.exists():
+                console.print(f"[yellow]Skip {s['id'][:12]}: source missing[/yellow]")
+                continue
 
         tags = db.get_tags(s["id"])
         adapter = get_adapter(s["tool"], claude_dir=_claude_dir())
